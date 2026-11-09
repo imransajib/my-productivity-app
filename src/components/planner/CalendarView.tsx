@@ -21,6 +21,7 @@ import {
 } from '@/lib/dates';
 import { EventCard, eventColor } from './EventCard';
 import { EmptyState, Segmented, Sheet, cx } from './ui';
+import { EventActionsContext, useEventActions } from './EventActions';
 
 export type CalendarMode = 'day' | 'week' | 'month';
 
@@ -38,6 +39,19 @@ interface Props {
 export function CalendarView({ events, selected, onSelect, mode, onModeChange }: Props) {
   const today = todayKey();
   const [detail, setDetail] = useState<CalendarEvent | null>(null);
+  const parentActions = useEventActions();
+  // Editing from the detail sheet closes it first, so the editor isn't stacked on top
+  const actions = useMemo(
+    () => ({
+      onEditEvent: parentActions.onEditEvent
+        ? (e: CalendarEvent) => {
+            setDetail(null);
+            parentActions.onEditEvent?.(e);
+          }
+        : undefined,
+    }),
+    [parentActions]
+  );
 
   const step = (dir: 1 | -1) => {
     if (mode === 'day') onSelect(addDays(selected, dir));
@@ -51,6 +65,7 @@ export function CalendarView({ events, selected, onSelect, mode, onModeChange }:
       : monthTitle(selected);
 
   return (
+    <EventActionsContext.Provider value={actions}>
     <div className="space-y-4">
       {/* Toolbar */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -92,6 +107,7 @@ export function CalendarView({ events, selected, onSelect, mode, onModeChange }:
         {detail && <EventCard event={detail} defaultOpen />}
       </Sheet>
     </div>
+    </EventActionsContext.Provider>
   );
 }
 

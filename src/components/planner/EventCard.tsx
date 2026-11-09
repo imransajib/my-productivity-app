@@ -1,11 +1,12 @@
 'use client';
 
 import { useId, useState } from 'react';
-import { ChevronDown, MapPin, Video, CalendarDays, Clock, AlignLeft, ExternalLink } from 'lucide-react';
+import { ChevronDown, MapPin, Video, CalendarDays, Clock, AlignLeft, ExternalLink, Pencil } from 'lucide-react';
 import type { CalendarEvent } from '@/lib/types';
 import { durationLabel, formatRange, isAllDay, isHappeningNow, plainText } from '@/lib/dates';
 import { getMapsSearchUrl, getProviderDisplayName } from '@/lib/meetingLinks';
 import { cx } from './ui';
+import { isEditableEvent, useEventActions } from './EventActions';
 
 export function eventColor(e: CalendarEvent): string {
   if (e.color) return e.color;
@@ -33,6 +34,8 @@ export function EventCard({ event, defaultOpen = false }: { event: CalendarEvent
   const [open, setOpen] = useState(defaultOpen);
   const [showAllNotes, setShowAllNotes] = useState(false);
   const panelId = useId();
+  const { onEditEvent } = useEventActions();
+  const editable = isEditableEvent(event) && Boolean(onEditEvent);
   const now = isHappeningNow(event);
   const notes = plainText(event.description);
   const provider = event.meetingUrl ? getProviderDisplayName(event.meetingProvider) : null;
@@ -142,6 +145,30 @@ export function EventCard({ event, defaultOpen = false }: { event: CalendarEvent
               </div>
             )}
           </dl>
+          {(editable || event.htmlLink) && (
+            <div className="flex gap-2 pt-1">
+              {editable && (
+                <button
+                  type="button"
+                  onClick={() => onEditEvent?.(event)}
+                  className="flex-1 min-h-[40px] rounded-xl bg-surface-2 hover:bg-surface-3 text-[14px] font-medium text-fg flex items-center justify-center gap-2"
+                >
+                  <Pencil className="w-4 h-4" /> Edit event
+                </button>
+              )}
+              {event.htmlLink && (
+                <a
+                  href={event.htmlLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 min-h-[40px] rounded-xl bg-surface-2 hover:bg-surface-3 text-[14px] font-medium text-fg flex items-center justify-center gap-2"
+                >
+                  <ExternalLink className="w-4 h-4" /> Open in Google Calendar
+                </a>
+              )}
+            </div>
+          )}
+          {event.source === 'apple' && <p className="text-[12.5px] text-subtle">To change this event, use the Calendar app on your iPhone or Mac.</p>}
         </div>
       )}
     </article>

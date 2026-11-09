@@ -18,6 +18,7 @@ import { CalendarView, type CalendarMode } from '@/components/planner/CalendarVi
 import { AppearanceSettings, NotificationSettings, ReviewView, SignInCard, TasksView, TodayView } from '@/components/planner/views';
 import { cx } from '@/components/planner/ui';
 import { TaskComposer } from '@/components/planner/TaskComposer';
+import { EventActionsContext } from '@/components/planner/EventActions';
 
 type Tab = 'today' | 'calendar' | 'tasks' | 'review' | 'settings';
 
@@ -45,9 +46,13 @@ export default function PlannerApp() {
   const [tab, setTab] = useState<Tab>('today');
   const [selected, setSelected] = useState<string>(''); // set after mount (no clock reads during prerender)
   const [calendarMode, setCalendarMode] = useState<CalendarMode>('month');
-  const [composer, setComposer] = useState<{ open: boolean; task: Task | null }>({ open: false, task: null });
+  const [composer, setComposer] = useState<{ open: boolean; task: Task | null; event?: CalendarEvent | null }>({ open: false, task: null });
   const openNew = useCallback(() => setComposer({ open: true, task: null }), []);
   const openEdit = useCallback((task: Task) => setComposer({ open: true, task }), []);
+  const openEditEvent = useCallback((event: CalendarEvent) => setComposer({ open: true, task: null, event }), []);
+  const eventActions = useMemo(() => ({ onEditEvent: openEditEvent }), [openEditEvent]);
+  // Last deletion, kept for a few seconds so it can be undone
+  const [undo, setUndo] = useState<{ label: string; restore: () => void } | null>(null);
   const [toast, setToast] = useState<{ title: string; body: string } | null>(null);
   const [greeting, setGreeting] = useState('Hello');
 
@@ -136,7 +141,7 @@ export default function PlannerApp() {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        setComposer((c) => ({ open: !c.open, task: null }));
+        setComposer((c) => ({ open: !c.open, task: null, event: null }));
       }
     };
     window.addEventListener('keydown', onKey);
@@ -150,7 +155,36 @@ export default function PlannerApp() {
       prev.map((t) => (t.id === id ? { ...t, isCompleted: !t.isCompleted, completedAt: !t.isCompleted ? now : undefined, updatedAt: now } : t))
     );
   }, []);
-  const deleteTask = useCallback((id: string) => setTasks((prev) => prev.filter((t) => t.id !== id)), []);
+  const deleteTask = useCallback((id: string) => {
+    setTasks((prev) => {
+      const gone = prev.find((t) => t.id === id);
+      if (gone) {
+        setUndo({
+          label: 'Task deleted',
+          // re-adding with a newer timestamp also beats the deletion on other devices
+          restore: () => setTasks((p) => (p.some((t) => t.id === id) ? p : [{ ...gone, updatedAt: new Date().toISOString() }, ...p])),
+        });
+      }
+      return prev.filter((t) => t.id !== id);
+    });
+  }, []);
+  const deleteEvent = useCallback((id: string) => {
+    setEvents((prev) => {
+      const gone = prev.find((e) => e.id === id);
+      if (gone) {
+        setUndo({
+          label: 'Event deleted',
+          restore: () => setEvents((p) => (p.some((e) => e.id === id) ? p : [...p, { ...gone, updatedAt: new Date().toISOString() }])),
+        });
+      }
+      return prev.filter((e) => e.id !== id);
+    });
+  }, []);
+  useEffect(() => {
+    if (!undo) return;
+    const t = window.setTimeout(() => setUndo(null), 6000);
+    return () => window.clearTimeout(t);
+  }, [undo]);
   const moveOverdue = useCallback(() => {
     const today = todayKey();
     const now = new Date().toISOString();
@@ -162,7 +196,10 @@ export default function PlannerApp() {
   const saveTask = useCallback((t: Task) => {
     setTasks((prev) => (prev.some((x) => x.id === t.id) ? prev.map((x) => (x.id === t.id ? t : x)) : [t, ...prev]));
   }, []);
-  const saveEvent = useCallback((e: CalendarEvent) => setEvents((prev) => [...prev, e]), []);
+  const saveEvent = useCallback(
+    (e: CalendarEvent) => setEvents((prev) => (prev.some((x) => x.id === e.id) ? prev.map((x) => (x.id === e.id ? e : x)) : [...prev, e])),
+    []
+  );
 
   // Keep reminder times right after any date/time change (e.g. "Move to today")
   useEffect(() => {
@@ -211,6 +248,7 @@ export default function PlannerApp() {
   const tabTitle = TABS.find((t) => t.id === tab)?.label ?? '';
 
   return (
+    <EventActionsContext.Provider value={eventActions}>
     <div className="min-h-dvh bg-bg">
       {/* ---------- Desktop sidebar ---------- */}
       <aside className="hidden md:flex fixed inset-y-0 left-0 w-64 flex-col border-r border-line bg-surface/70 backdrop-blur-xl p-4">
@@ -368,12 +406,32 @@ export default function PlannerApp() {
       <TaskComposer
         open={composer.open}
         task={composer.task}
+        event={composer.event}
         defaultDate={defaultDay}
         onClose={() => setComposer({ open: false, task: null })}
         onSaveTask={saveTask}
         onDeleteTask={deleteTask}
         onSaveEvent={saveEvent}
+        onDeleteEvent={deleteEvent}
       />
+
+      {undo && (
+        <div
+          role="status"
+          className="fixed z-[65] left-4 right-4 md:left-1/2 md:right-auto md:-translate-x-1/2 md:w-[360px] bottom-[calc(env(safe-area-inset-bottom)+80px)] md:bottom-8 px-4 py-3 rounded-2xl bg-fg text-bg shadow-2xl flex items-center gap-3 animate-pop-in"
+        >
+          <span className="flex-1 text-[14px] font-medium">{undo.label}</span>
+          <button
+            onClick={() => {
+              undo.restore();
+              setUndo(null);
+            }}
+            className="min-h-[36px] px-3 -mr-1 rounded-lg text-[14px] font-semibold text-[#b9b8ff] dark:text-[#4745c4] hover:bg-white/10 dark:hover:bg-black/5"
+          >
+            Undo
+          </button>
+        </div>
+      )}
 
       {toast && (
         <div
@@ -404,5 +462,6 @@ export default function PlannerApp() {
         onAppleConnected={() => syncNow()}
       />
     </div>
+    </EventActionsContext.Provider>
   );
 }

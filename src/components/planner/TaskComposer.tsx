@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { Bell, CalendarDays, Clock, Trash2, X } from 'lucide-react';
 import type { CalendarEvent, Priority, Task } from '@/lib/types';
-import { addDays, fromKey, relativeDayLabel, todayKey } from '@/lib/dates';
+import { addDays, dateKey, fromKey, isAllDay, parseEventDate, relativeDayLabel, todayKey } from '@/lib/dates';
 import { parseNaturalLanguageInput } from '@/lib/nlpParser';
 import { computeReminderAt, DEFAULT_REMINDER_TIME, REMINDER_OPTIONS } from '@/lib/reminders';
 import { Segmented, Sheet, cx } from './ui';
@@ -56,25 +56,31 @@ export function TaskComposer({
   open,
   onClose,
   task,
+  event = null,
   defaultDate,
   onSaveTask,
   onDeleteTask,
   onSaveEvent,
+  onDeleteEvent,
 }: {
   open: boolean;
   onClose: () => void;
   task: Task | null; // null = new
+  event?: CalendarEvent | null; // editing one of Apex's own events
   defaultDate: string;
   onSaveTask: (t: Task) => void;
   onDeleteTask: (id: string) => void;
   onSaveEvent: (e: CalendarEvent) => void;
+  onDeleteEvent?: (id: string) => void;
 }) {
   // Remount per task so the draft starts fresh
   return open ? (
     <ComposerBody
-      key={task?.id ?? `new-${defaultDate}`}
+      key={task?.id ?? event?.id ?? `new-${defaultDate}`}
       onClose={onClose}
       task={task}
+      event={event}
+      onDeleteEvent={onDeleteEvent}
       defaultDate={defaultDate}
       onSaveTask={onSaveTask}
       onDeleteTask={onDeleteTask}
@@ -86,14 +92,32 @@ export function TaskComposer({
 function ComposerBody({
   onClose,
   task,
+  event,
   defaultDate,
   onSaveTask,
   onDeleteTask,
   onSaveEvent,
+  onDeleteEvent,
 }: Omit<Parameters<typeof TaskComposer>[0], 'open'>) {
-  const editing = Boolean(task);
+  const editingEvent = event ?? null;
+  const editing = Boolean(task || editingEvent);
   const [openedAt] = useState(() => Date.now());
-  const [draft, setDraft] = useState<Draft>(() => ({
+  const [draft, setDraft] = useState<Draft>(() => {
+    if (editingEvent) {
+      const start = parseEventDate(editingEvent.startTime);
+      const end = parseEventDate(editingEvent.endTime);
+      const allDay = isAllDay(editingEvent);
+      return {
+        kind: 'event',
+        title: editingEvent.title,
+        date: start ? dateKey(start) : defaultDate,
+        time: !allDay && start ? `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}` : '',
+        reminderMin: null,
+        priority: 'medium',
+        durationMin: !allDay && start && end ? Math.max(15, Math.round((+end - +start) / 60000)) : 60,
+      };
+    }
+    return {
     kind: 'task',
     title: task?.title ?? '',
     date: task ? task.dueDate ?? '' : defaultDate,
@@ -101,18 +125,19 @@ function ComposerBody({
     reminderMin: task?.reminderMin ?? null,
     priority: task?.priority ?? 'medium',
     durationMin: 60,
-  }));
+    };
+  });
   // Once the user picks a date/time by hand, typing no longer overrides it
   const [touched, setTouched] = useState({ date: editing, time: editing, priority: editing, kind: editing });
 
   const parsed = useMemo(() => (!editing && draft.title.trim() ? parseNaturalLanguageInput(draft.title) : null), [draft.title, editing]);
   const effective: Draft = {
     ...draft,
-    kind: editing ? 'task' : !touched.kind && parsed?.type === 'event' ? 'event' : draft.kind,
+    kind: editing ? draft.kind : !touched.kind && parsed?.type === 'event' ? 'event' : draft.kind,
     date: !touched.date && parsed?.date ? parsed.date : draft.date,
     time: !touched.time && parsed?.time ? parsed.time : draft.time,
     priority: !touched.priority && parsed?.priority ? parsed.priority : draft.priority,
-    durationMin: parsed?.durationMin ?? draft.durationMin,
+    durationMin: (!editing && parsed?.durationMin) || draft.durationMin,
   };
   const usedParse = Boolean(parsed && (parsed.date || parsed.time || parsed.priority) && parsed.title);
   const finalTitle = (usedParse && !editing ? parsed!.title : draft.title).trim();
@@ -134,7 +159,7 @@ function ComposerBody({
   const save = () => {
     if (!finalTitle) return;
     const now = new Date().toISOString();
-    if (effective.kind === 'event' && !editing) {
+    if (effective.kind === 'event') {
       const day = effective.date || today;
       const start = effective.time || '';
       const allDay = !start;
@@ -145,14 +170,15 @@ function ComposerBody({
         end = `${String(Math.floor(endMin / 60)).padStart(2, '0')}:${String(endMin % 60).padStart(2, '0')}`;
       }
       onSaveEvent({
-        id: newId('event'),
+        ...(editingEvent ?? {}),
+        id: editingEvent?.id ?? newId('event'),
         title: finalTitle,
         startTime: allDay ? `${day}T00:00:00` : `${day}T${start}:00`,
         endTime: allDay ? `${day}T23:59:59` : `${day}T${end}:00`,
         allDay,
         isAllDay: allDay,
-        source: 'local',
-        calendarName: 'My calendar',
+        source: editingEvent?.source ?? 'local',
+        calendarName: editingEvent?.calendarName ?? 'My calendar',
         updatedAt: now,
       });
     } else {
@@ -176,16 +202,17 @@ function ComposerBody({
     <Sheet
       open
       onClose={onClose}
-      title={editing ? 'Edit task' : 'New'}
+      title={editingEvent ? 'Edit event' : editing ? 'Edit task' : 'New'}
       footer={
         <div className="flex gap-2">
           {editing && (
             <button
               onClick={() => {
-                onDeleteTask(task!.id);
+                if (editingEvent) onDeleteEvent?.(editingEvent.id);
+                else onDeleteTask(task!.id);
                 onClose();
               }}
-              aria-label="Delete task"
+              aria-label={editingEvent ? 'Delete event' : 'Delete task'}
               className="w-12 min-h-[48px] rounded-xl bg-surface-2 text-danger flex items-center justify-center"
             >
               <Trash2 className="w-5 h-5" />

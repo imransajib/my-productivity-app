@@ -42,6 +42,8 @@ export interface CalendarEvent {
   calendarName?: string;
   color?: string;
   categoryId?: string;
+  /** Link to open the event in Google Calendar */
+  htmlLink?: string;
   updatedAt: string;
 }
 

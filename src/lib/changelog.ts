@@ -8,6 +8,15 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '0.7.0',
+    date: '2026-11-09',
+    notes: [
+      'Edit or delete events you created in Apex',
+      'Undo after deleting a task or event',
+      'Open Google events in Google Calendar with one tap',
+    ],
+  },
+  {
     version: '0.6.0',
     date: '2026-11-09',
     notes: [

@@ -219,6 +219,7 @@ export async function GET(request: NextRequest) {
         meetingProvider: meetingInfo.meetingProvider,
         source: "google",
         calendarName: calendar.summary || "Google Calendar",
+        htmlLink: typeof item.htmlLink === "string" && item.htmlLink.startsWith("https://www.google.com/calendar") ? item.htmlLink : undefined,
         color: calendar.backgroundColor || undefined,
         updatedAt: item.updated || new Date().toISOString(),
       };
