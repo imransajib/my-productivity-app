@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
 import { ServiceWorkerRegistrar } from '@/components/ServiceWorkerRegistrar';
+import { UpdateBanner } from '@/components/UpdateBanner';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -28,7 +29,7 @@ export const metadata: Metadata = {
     telephone: false,
   },
   icons: {
-    apple: '/apple-touch-icon.svg',
+    apple: '/apple-touch-icon.png',
     icon: '/icon.svg',
   },
 };
@@ -52,6 +53,7 @@ export default function RootLayout({
       >
         <Providers>
           <ServiceWorkerRegistrar />
+          <UpdateBanner />
           {children}
         </Providers>
       </body>

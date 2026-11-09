@@ -45,6 +45,7 @@ import {
 import { parseNaturalLanguageInput } from '@/lib/nlpParser';
 import { useCalendarSync, formatLastSynced } from '@/lib/useCalendarSync';
 import { CalendarSettings } from '@/components/CalendarSettings';
+import { AppInfoSettings } from '@/components/AppInfoSettings';
 import { OnboardingModal } from '@/components/OnboardingModal';
 import { getMapsSearchUrl, getProviderDisplayName } from '@/lib/meetingLinks';
 
@@ -1234,6 +1235,7 @@ export default function PlannerApp() {
               onAddApple={() => setIsOnboardingOpen(true)}
             />
           )}
+          {activeTab === 'settings' && <AppInfoSettings />}
         </div>
       </main>
 

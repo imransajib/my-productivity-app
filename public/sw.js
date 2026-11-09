@@ -1,54 +1,84 @@
-// Apex Planner — Minimal App Shell Service Worker
-// Caches the app shell for offline use; network-first for API routes.
-
-const CACHE_NAME = 'apex-planner-v1';
-
-const APP_SHELL_URLS = [
-  '/',
-  '/icon.svg',
-  '/icon-192.svg',
-  '/icon-512.svg',
-  '/apple-touch-icon.svg',
-];
+// Apex Planner service worker
+// - Pages: network-first (3 s timeout) so reopening the app always loads the newest release,
+//   falling back to the cached page when offline.
+// - /_next/static: cache-first (file names are content-hashed, so they never go stale).
+// - API + auth: never cached.
+const SHELL = 'apex-shell-v2';
+const STATIC = 'apex-static-v1';
+const PRECACHE = ['/', '/icon-192.png', '/icon-512.png', '/apple-touch-icon.png', '/manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL_URLS))
-  );
+  event.waitUntil(caches.open(SHELL).then((c) => c.addAll(PRECACHE)).catch(() => {}));
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))
-      )
-    )
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== SHELL && k !== STATIC).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
-self.addEventListener('fetch', (event) => {
-  const url = new URL(event.request.url);
+self.addEventListener('message', (event) => {
+  if (event.data === 'skipWaiting') self.skipWaiting();
+});
 
-  // Network-first for API routes and auth — always fresh
-  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/_next/')) {
-    event.respondWith(fetch(event.request));
+function timeout(ms) {
+  return new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms));
+}
+
+self.addEventListener('fetch', (event) => {
+  const req = event.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith('/api/')) return; // always network
+
+  if (req.mode === 'navigate') {
+    event.respondWith(
+      Promise.race([fetch(req), timeout(3000)])
+        .then((res) => {
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(SHELL).then((c) => c.put('/', copy));
+          }
+          return res;
+        })
+        .catch(() => caches.match('/').then((r) => r || fetch(req)))
+    );
     return;
   }
 
-  // Cache-first for app shell assets
+  if (url.pathname.startsWith('/_next/static/')) {
+    event.respondWith(
+      caches.match(req).then((cached) =>
+        cached ||
+        fetch(req).then((res) => {
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(STATIC).then((c) => c.put(req, copy));
+          }
+          return res;
+        })
+      )
+    );
+    return;
+  }
+
+  // Icons, manifest etc.: stale-while-revalidate
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request).then((response) => {
-        if (response.ok) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-        }
-        return response;
-      });
+    caches.match(req).then((cached) => {
+      const network = fetch(req)
+        .then((res) => {
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(SHELL).then((c) => c.put(req, copy));
+          }
+          return res;
+        })
+        .catch(() => cached);
+      return cached || network;
     })
   );
 });
