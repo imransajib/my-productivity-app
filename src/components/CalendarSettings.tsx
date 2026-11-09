@@ -20,6 +20,7 @@ interface Props {
   status: SyncStatus;
   onSyncNow: () => void;
   onAddApple: () => void;
+  cloudStatus?: 'off' | 'syncing' | 'synced' | 'offline';
 }
 
 function StatusPill({ tone, label }: { tone: 'ok' | 'warn' | 'off'; label: string }) {
@@ -63,6 +64,7 @@ export function CalendarSettings({
   status,
   onSyncNow,
   onAddApple,
+  cloudStatus = 'off',
 }: Props) {
   // local override until the next sync returns the saved selection
   const [appleOverride, setAppleOverride] = useState<string[] | null>(null);
@@ -103,6 +105,20 @@ export function CalendarSettings({
         <div>
           <h2 className="text-lg font-semibold text-white">Calendars</h2>
           <p className="text-sm text-slate-400">{formatLastSynced(status.lastSyncedAt)} · auto-syncs every 5 min</p>
+          <p className="text-xs mt-0.5 flex items-center gap-1.5 text-slate-500">
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                cloudStatus === 'synced' ? 'bg-emerald-400' : cloudStatus === 'syncing' ? 'bg-amber-400 animate-pulse' : 'bg-slate-600'
+              }`}
+            />
+            {cloudStatus === 'synced'
+              ? 'Tasks & calendars synced to your account'
+              : cloudStatus === 'syncing'
+              ? 'Syncing with your account…'
+              : cloudStatus === 'offline'
+              ? 'Offline: changes will sync when you reconnect'
+              : 'Saved on this device only'}
+          </p>
         </div>
         <button
           onClick={onSyncNow}

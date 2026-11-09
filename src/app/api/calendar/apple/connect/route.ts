@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { readAppleRaw, writeAppleRaw, deleteAppleRaw } from "@/lib/db";
 import { auth } from "@/auth";
 import { createDAVClient } from "tsdav";
 import {
   encryptJson,
   decryptJson,
-  getAppleCookieOptions,
-  APPLE_COOKIE_NAME,
   AppleCredentials,
   AppleCalDavCredentials,
   AppleIcsCredentials,
@@ -19,8 +17,7 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const cookieStore = await cookies();
-  const rawCookie = cookieStore.get(APPLE_COOKIE_NAME)?.value;
+  const rawCookie = await readAppleRaw(session.user.email);
   if (!rawCookie) {
     return NextResponse.json({ connected: false });
   }
@@ -141,8 +138,7 @@ export async function POST(request: NextRequest) {
 
       // Store credentials securely in encrypted httpOnly cookie
       const encryptedValue = encryptJson(credentialsData);
-      const cookieStore = await cookies();
-      cookieStore.set(APPLE_COOKIE_NAME, encryptedValue, getAppleCookieOptions());
+      await writeAppleRaw(session.user.email, encryptedValue);
 
       return NextResponse.json({
         success: true,
@@ -233,8 +229,7 @@ export async function POST(request: NextRequest) {
       };
 
       const encryptedValue = encryptJson(credentialsData);
-      const cookieStore = await cookies();
-      cookieStore.set(APPLE_COOKIE_NAME, encryptedValue, getAppleCookieOptions());
+      await writeAppleRaw(session.user.email, encryptedValue);
 
       return NextResponse.json({
         success: true,

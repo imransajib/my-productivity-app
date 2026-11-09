@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { readAppleRaw, writeAppleRaw, deleteAppleRaw } from "@/lib/db";
 import { auth } from "@/auth";
 import { createDAVClient } from "tsdav";
 import {
   decryptJson,
-  APPLE_COOKIE_NAME,
   AppleCredentials,
 } from "@/lib/crypto";
 import { parseIcsEvents } from "@/lib/icalParser";
@@ -16,8 +15,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const cookieStore = await cookies();
-  const rawCookie = cookieStore.get(APPLE_COOKIE_NAME)?.value;
+  const rawCookie = await readAppleRaw(session.user.email);
   if (!rawCookie) {
     return NextResponse.json({
       connected: false,
@@ -201,8 +199,7 @@ export async function DELETE() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const cookieStore = await cookies();
-  cookieStore.delete(APPLE_COOKIE_NAME);
+  await deleteAppleRaw(session.user.email);
 
   return NextResponse.json({
     success: true,

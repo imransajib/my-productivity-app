@@ -8,6 +8,15 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '0.4.0',
+    date: '2026-11-09',
+    notes: [
+      'Your Apple Calendar connection now follows your account to every device',
+      'Tasks, events and calendar choices sync between phone and computer',
+      'Sync status shown in Settings → Calendars',
+    ],
+  },
+  {
     version: '0.3.0',
     date: '2026-11-09',
     notes: [

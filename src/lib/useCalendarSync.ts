@@ -65,6 +65,7 @@ export function useCalendarSync(userEmail: string | null, enabled: boolean) {
   const [syncedEvents, setSyncedEvents] = useState<CalendarEvent[]>([]);
   const [googleCalendars, setGoogleCalendars] = useState<GoogleCalendarItem[]>([]);
   const [selectedGoogleIds, setSelectedGoogleIds] = useState<string[] | null>(null);
+  const [selectionUpdatedAt, setSelectionUpdatedAt] = useState<string | undefined>(undefined);
   const [apple, setApple] = useState<AppleCalendarSyncResult>({ events: [], connected: false });
   const [status, setStatus] = useState<SyncStatus>({
     isSyncing: false,
@@ -94,6 +95,7 @@ export function useCalendarSync(userEmail: string | null, enabled: boolean) {
       setStatus((s) => ({ ...s, lastSyncedAt: cached.syncedAt }));
     }
     setSelectedGoogleIds(readJSON<string[] | null>(selectionKey, null));
+    setSelectionUpdatedAt(readJSON<string | undefined>(`${selectionKey}_at`, undefined));
   }, [userEmail, cacheKey, selectionKey]);
 
   const syncNow = useCallback(async () => {
@@ -159,12 +161,28 @@ export function useCalendarSync(userEmail: string | null, enabled: boolean) {
         selectedRef.current ??
         googleCalendars.filter((c) => c.selected !== false).map((c) => c.id);
       const next = current.includes(id) ? current.filter((x) => x !== id) : [...current, id];
+      const at = new Date().toISOString();
       selectedRef.current = next;
       setSelectedGoogleIds(next);
+      setSelectionUpdatedAt(at);
       writeJSON(selectionKey, next);
+      writeJSON(`${selectionKey}_at`, at);
       syncNow();
     },
     [googleCalendars, selectionKey, syncNow]
+  );
+
+  /** Apply a calendar choice made on another device. */
+  const applyRemoteSelection = useCallback(
+    (ids: string[] | null | undefined, at: string | undefined) => {
+      selectedRef.current = ids ?? null;
+      setSelectedGoogleIds(ids ?? null);
+      setSelectionUpdatedAt(at);
+      writeJSON(selectionKey, ids ?? null);
+      writeJSON(`${selectionKey}_at`, at);
+      syncNow();
+    },
+    [selectionKey, syncNow]
   );
 
   const effectiveSelectedGoogleIds =
@@ -175,6 +193,8 @@ export function useCalendarSync(userEmail: string | null, enabled: boolean) {
     googleCalendars,
     selectedGoogleIds: effectiveSelectedGoogleIds,
     toggleGoogleCalendar,
+    googleSelection: { googleCalendarIds: selectedGoogleIds, updatedAt: selectionUpdatedAt },
+    applyRemoteSelection,
     apple,
     status,
     syncNow,

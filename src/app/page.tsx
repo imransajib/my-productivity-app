@@ -44,6 +44,7 @@ import {
 } from '@/lib/store';
 import { parseNaturalLanguageInput } from '@/lib/nlpParser';
 import { useCalendarSync, formatLastSynced } from '@/lib/useCalendarSync';
+import { useCloudState } from '@/lib/useCloudState';
 import { CalendarSettings } from '@/components/CalendarSettings';
 import { AppInfoSettings } from '@/components/AppInfoSettings';
 import { OnboardingModal } from '@/components/OnboardingModal';
@@ -236,6 +237,20 @@ export default function PlannerApp() {
   useEffect(() => {
     setSyncError(syncStatus.googleReconnect ? 'Google session expired. Please reconnect your account.' : syncStatus.googleError);
   }, [syncStatus.googleReconnect, syncStatus.googleError]);
+
+  // Account sync: tasks, local events, categories and calendar choices follow the user across devices
+  const cloud = useCloudState({
+    email: userEmail,
+    enabled: status === 'authenticated',
+    tasks,
+    setTasks,
+    events,
+    setEvents,
+    categories,
+    setCategories,
+    prefs: calendarSync.googleSelection,
+    onRemotePrefs: (p) => calendarSync.applyRemoteSelection(p.googleCalendarIds, p.updatedAt),
+  });
 
   // First-run onboarding: connect calendars
   const onboardedKey = `apex_onboarded_${userEmail ?? 'anon'}`;
@@ -692,7 +707,7 @@ export default function PlannerApp() {
                       setTasks((prev) =>
                         prev.map((t) =>
                           t.dueDate && t.dueDate < todayStr && !t.isCompleted
-                            ? { ...t, dueDate: todayStr }
+                            ? { ...t, dueDate: todayStr, updatedAt: new Date().toISOString() }
                             : t
                         )
                       );
@@ -1171,7 +1186,7 @@ export default function PlannerApp() {
                         <button
                           onClick={() => {
                             setTasks((prev) =>
-                              prev.map((item) => (item.id === t.id ? { ...item, dueDate: todayStr } : item))
+                              prev.map((item) => (item.id === t.id ? { ...item, dueDate: todayStr, updatedAt: new Date().toISOString() } : item))
                             );
                           }}
                           className="text-xs text-indigo-400 hover:text-indigo-300 font-medium font-mono"
@@ -1233,6 +1248,7 @@ export default function PlannerApp() {
               status={syncStatus}
               onSyncNow={syncNow}
               onAddApple={() => setIsOnboardingOpen(true)}
+              cloudStatus={cloud.status}
             />
           )}
           {activeTab === 'settings' && <AppInfoSettings />}

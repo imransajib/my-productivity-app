@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { readAppleRaw, writeAppleRaw, deleteAppleRaw } from "@/lib/db";
 import { auth } from "@/auth";
 import {
   encryptJson,
   decryptJson,
-  getAppleCookieOptions,
-  APPLE_COOKIE_NAME,
   AppleCredentials,
 } from "@/lib/crypto";
 
@@ -15,8 +13,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const cookieStore = await cookies();
-  const rawCookie = cookieStore.get(APPLE_COOKIE_NAME)?.value;
+  const rawCookie = await readAppleRaw(session.user.email);
   if (!rawCookie) {
     return NextResponse.json(
       { error: "No Apple Calendar account connected." },
@@ -54,7 +51,7 @@ export async function POST(request: NextRequest) {
     credentials.lastSyncedAt = new Date().toISOString();
 
     const encrypted = encryptJson(credentials);
-    cookieStore.set(APPLE_COOKIE_NAME, encrypted, getAppleCookieOptions());
+    await writeAppleRaw(session.user.email, encrypted);
 
     return NextResponse.json({
       success: true,
