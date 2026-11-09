@@ -1,4 +1,5 @@
 import { CalendarEvent } from './types';
+import { extractMeetingInfo, cleanLocation } from './meetingLinks';
 
 function parseIcsDate(val: string): { iso: string; isAllDay: boolean } {
   // Format: 20251115T150000Z or 20251115T150000 or 20251115
@@ -62,6 +63,21 @@ export function parseICS(icsContent: string, calendarName: string = 'Apple Calen
           startD.setHours(startD.getHours() + 1);
           currentEvent.endTime = startD.toISOString().split('.')[0];
         }
+
+        // Apply meeting link and location extraction
+        const meetingInfo = extractMeetingInfo({
+          location: currentEvent.location,
+          description: currentEvent.description,
+          url: currentEvent.meetingUrl,
+        });
+
+        if (meetingInfo.meetingUrl) {
+          currentEvent.meetingUrl = meetingInfo.meetingUrl;
+          currentEvent.meetingProvider = meetingInfo.meetingProvider;
+        }
+
+        currentEvent.location = cleanLocation(currentEvent.location, currentEvent.meetingUrl);
+
         events.push(currentEvent as CalendarEvent);
       }
       currentEvent = null;
@@ -94,6 +110,7 @@ export function parseICS(icsContent: string, calendarName: string = 'Apple Calen
         const parsed = parseIcsDate(value);
         currentEvent.startTime = parsed.iso;
         currentEvent.isAllDay = parsed.isAllDay;
+        currentEvent.allDay = parsed.isAllDay;
         break;
       }
       case 'DTEND': {
@@ -105,4 +122,63 @@ export function parseICS(icsContent: string, calendarName: string = 'Apple Calen
   }
 
   return events;
+}
+
+export interface FetchGoogleCalendarOptions {
+  from?: string; // ISO string
+  to?: string;   // ISO string
+}
+
+export interface GoogleCalendarSyncResult {
+  events: CalendarEvent[];
+  error?: string;
+  reconnectRequired?: boolean;
+}
+
+/**
+ * Fetches real Google Calendar events from the server route /api/calendar/google.
+ * Replaces previous mock sync with actual OAuth-authenticated Google Calendar API sync.
+ */
+export async function fetchGoogleCalendarEvents(
+  options: FetchGoogleCalendarOptions = {}
+): Promise<GoogleCalendarSyncResult> {
+  try {
+    const params = new URLSearchParams();
+    if (options.from) params.set('from', options.from);
+    if (options.to) params.set('to', options.to);
+
+    const qs = params.toString();
+    const endpoint = `/api/calendar/google${qs ? `?${qs}` : ''}`;
+
+    const res = await fetch(endpoint, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+      },
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      return {
+        events: [],
+        error: data.error || `Google Calendar sync failed (${res.status})`,
+        reconnectRequired: Boolean(data.reconnectRequired || res.status === 401),
+      };
+    }
+
+    const events: CalendarEvent[] = Array.isArray(data.events)
+      ? data.events
+      : Array.isArray(data)
+      ? data
+      : [];
+
+    return { events };
+  } catch (err: any) {
+    console.error('Error fetching Google Calendar events:', err);
+    return {
+      events: [],
+      error: err?.message || 'Network error connecting to Google Calendar sync route',
+    };
+  }
 }

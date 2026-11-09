@@ -1,5 +1,7 @@
 export type Priority = 'urgent' | 'high' | 'medium' | 'low';
 
+export type MeetingProvider = 'meet' | 'zoom' | 'teams' | 'webex' | 'other';
+
 export interface Subtask {
   id: string;
   title: string;
@@ -28,10 +30,13 @@ export interface CalendarEvent {
   startTime: string; // ISO string e.g. YYYY-MM-DDTHH:mm:ss
   endTime: string; // ISO string
   isAllDay?: boolean;
+  allDay?: boolean;
   location?: string;
   meetingUrl?: string;
-  source: 'local' | 'google' | 'apple' | 'ics' | string;
+  meetingProvider?: MeetingProvider;
+  source: 'google' | 'apple' | 'local' | 'ics' | string;
   calendarName?: string;
+  color?: string;
   categoryId?: string;
   updatedAt: string;
 }

@@ -65,8 +65,10 @@ export const INITIAL_EVENTS: CalendarEvent[] = [
     startTime: '2026-11-09T10:00:00',
     endTime: '2026-11-09T10:45:00',
     isAllDay: false,
+    allDay: false,
     location: 'Google Meet',
     meetingUrl: 'https://meet.google.com/new',
+    meetingProvider: 'meet',
     source: 'google',
     calendarName: 'Team Workspace',
     categoryId: 'cat-work',
@@ -79,6 +81,7 @@ export const INITIAL_EVENTS: CalendarEvent[] = [
     startTime: '2026-11-09T15:00:00',
     endTime: '2026-11-09T16:00:00',
     isAllDay: false,
+    allDay: false,
     location: 'Design Studio Room 4',
     source: 'local',
     calendarName: 'My Calendar',
@@ -86,6 +89,24 @@ export const INITIAL_EVENTS: CalendarEvent[] = [
     updatedAt: '2026-11-09T08:00:00.000Z',
   },
 ];
+
+/**
+ * Derives a user-namespaced localStorage key for tasks based on their authenticated email.
+ */
+export function getUserTaskStorageKey(email?: string | null): string {
+  if (!email) return 'daily_os_tasks';
+  const sanitized = email.toLowerCase().replace(/[^a-z0-9_.-]/g, '_');
+  return `daily_os_tasks_${sanitized}`;
+}
+
+/**
+ * Derives a user-namespaced localStorage key for events based on their authenticated email.
+ */
+export function getUserEventStorageKey(email?: string | null): string {
+  if (!email) return 'daily_os_events';
+  const sanitized = email.toLowerCase().replace(/[^a-z0-9_.-]/g, '_');
+  return `daily_os_events_${sanitized}`;
+}
 
 export function getLocalData<T>(key: string, fallback: T): T {
   if (typeof window === 'undefined') return fallback;
