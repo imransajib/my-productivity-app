@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { getRedis, stateKey } from '@/lib/db';
 import { EMPTY_STATE, mergeStates, sanitizeState, type UserState } from '@/lib/stateMerge';
+import { syncReminderSchedule } from '@/lib/reminderSchedule';
 
 const MAX_BYTES = 900_000; // stay well under Upstash's 1 MB value limit
 
@@ -42,5 +43,10 @@ export async function PUT(request: NextRequest) {
   const stored = await redis.get<UserState>(stateKey(email));
   const merged = mergeStates(stored ? sanitizeState(stored) : EMPTY_STATE, incoming);
   await redis.set(stateKey(email), merged);
+  try {
+    await syncReminderSchedule(email, merged.tasks, request.nextUrl.origin);
+  } catch (err) {
+    console.error('reminder scheduling failed', err);
+  }
   return NextResponse.json({ enabled: true, state: merged }, { headers: { 'Cache-Control': 'no-store' } });
 }

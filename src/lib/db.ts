@@ -25,6 +25,7 @@ export function userId(email: string): string {
 
 const appleKey = (email: string) => `apex:apple:${userId(email)}`;
 export const stateKey = (email: string) => `apex:state:${userId(email)}`;
+export const stateKeyForUid = (uid: string) => `apex:state:${uid}`;
 
 /**
  * Encrypted Apple credentials blob (AES-256-GCM via src/lib/crypto.ts).

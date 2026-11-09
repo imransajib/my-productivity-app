@@ -21,6 +21,10 @@ export interface Task {
   updatedAt: string;
   subtasks: Subtask[];
   categoryId?: string;
+  /** minutes before the due time (0 = at the time); null/undefined = no reminder */
+  reminderMin?: number | null;
+  /** absolute reminder time (ISO, computed on the device so it carries the right time zone) */
+  reminderAt?: string | null;
 }
 
 export interface CalendarEvent {

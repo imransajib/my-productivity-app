@@ -3,7 +3,7 @@
 //   falling back to the cached page when offline.
 // - /_next/static: cache-first (file names are content-hashed, so they never go stale).
 // - API + auth: never cached.
-const SHELL = 'apex-shell-v2';
+const SHELL = 'apex-shell-v3';
 const STATIC = 'apex-static-v1';
 const PRECACHE = ['/', '/icon-192.png', '/icon-512.png', '/apple-touch-icon.png', '/manifest.webmanifest'];
 
@@ -79,6 +79,44 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(() => cached);
       return cached || network;
+    })
+  );
+});
+
+// ---------- Reminders (Web Push) ----------
+self.addEventListener('push', (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { title: 'Apex Planner', body: event.data ? event.data.text() : '' };
+  }
+  const title = data.title || 'Reminder';
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: data.body || '',
+      tag: data.tag || undefined,
+      renotify: Boolean(data.tag),
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      data: { url: data.url || '/' },
+    })
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const target = new URL((event.notification.data && event.notification.data.url) || '/', self.location.origin).href;
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((wins) => {
+      for (const w of wins) {
+        if (w.url.startsWith(self.location.origin)) {
+          w.focus();
+          w.postMessage({ type: 'open', url: target });
+          return;
+        }
+      }
+      return self.clients.openWindow(target);
     })
   );
 });

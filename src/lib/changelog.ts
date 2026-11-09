@@ -8,6 +8,15 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '0.6.0',
+    date: '2026-11-09',
+    notes: [
+      'Tasks: pick a date and time, tap a task to edit it',
+      'Reminders: at the time, 10/30 min, 1 hour or 1 day before',
+      'Turn on reminders in Settings to get notifications',
+    ],
+  },
+  {
     version: '0.5.0',
     date: '2026-11-09',
     notes: [

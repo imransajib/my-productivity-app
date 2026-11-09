@@ -17,6 +17,7 @@ import {
 import type { CalendarEvent, Task } from '@/lib/types';
 import { addDays, eventsOnDay, fromKey, isAllDay, isHappeningNow, longDate, parseEventDate, relativeDayLabel, todayKey, weekDays } from '@/lib/dates';
 import type { ThemePref } from '@/lib/useTheme';
+import type { PushState } from '@/lib/useReminders';
 import { EventCard } from './EventCard';
 import { TaskRow } from './TaskRow';
 import { EmptyState, Segmented, SectionTitle, cx } from './ui';
@@ -34,6 +35,7 @@ export function TodayView({
   onDeleteTask,
   onMoveOverdue,
   onAdd,
+  onEditTask,
 }: {
   greeting: string;
   name?: string | null;
@@ -45,6 +47,7 @@ export function TodayView({
   onDeleteTask: (id: string) => void;
   onMoveOverdue: () => void;
   onAdd: () => void;
+  onEditTask: (t: Task) => void;
 }) {
   const today = todayKey();
   const days = weekDays(day);
@@ -168,7 +171,7 @@ export function TodayView({
         ) : (
           <div className="space-y-2">
             {dayTasks.map((t) => (
-              <TaskRow key={t.id} task={t} onToggle={onToggleTask} onDelete={onDeleteTask} />
+              <TaskRow key={t.id} task={t} onToggle={onToggleTask} onDelete={onDeleteTask} onEdit={onEditTask} />
             ))}
           </div>
         )}
@@ -186,11 +189,13 @@ export function TasksView({
   onToggleTask,
   onDeleteTask,
   onAdd,
+  onEditTask,
 }: {
   tasks: Task[];
   onToggleTask: (id: string) => void;
   onDeleteTask: (id: string) => void;
   onAdd: () => void;
+  onEditTask: (t: Task) => void;
 }) {
   const [filter, setFilter] = useState<TaskFilter>('today');
   const today = todayKey();
@@ -251,7 +256,7 @@ export function TasksView({
               <SectionTitle>{g.title}</SectionTitle>
               <div className="space-y-2">
                 {g.items.map((t) => (
-                  <TaskRow key={t.id} task={t} onToggle={onToggleTask} onDelete={onDeleteTask} showDate={filter !== 'upcoming'} />
+                  <TaskRow key={t.id} task={t} onToggle={onToggleTask} onDelete={onDeleteTask} onEdit={onEditTask} showDate={filter !== 'upcoming'} />
                 ))}
               </div>
             </section>
@@ -339,7 +344,6 @@ export function ReviewView({ tasks, events }: { tasks: Task[]; events: CalendarE
 /* ---------------- Settings: appearance + notifications ---------------- */
 
 export function AppearanceSettings({ theme, onTheme }: { theme: ThemePref; onTheme: (t: ThemePref) => void }) {
-  const [notif, setNotif] = useState<string>(() => (typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'));
   return (
     <section className="max-w-2xl mx-auto rounded-2xl bg-surface border border-line shadow-card overflow-hidden">
       <div className="p-4 border-b border-line">
@@ -358,22 +362,55 @@ export function AppearanceSettings({ theme, onTheme }: { theme: ThemePref; onThe
           ]}
         />
       </div>
-      {notif !== 'unsupported' && (
-        <div className="px-4 pb-4 flex items-center gap-3">
-          <Bell className="w-4 h-4 text-subtle" />
-          <p className="flex-1 text-[14px] text-fg">Notifications</p>
-          {notif === 'granted' ? (
-            <span className="text-[13px] text-success font-medium">On</span>
-          ) : (
-            <button
-              onClick={async () => setNotif(await Notification.requestPermission())}
-              className="min-h-[36px] px-3 rounded-lg bg-surface-2 text-[13px] font-medium text-fg"
-            >
-              {notif === 'denied' ? 'Blocked in browser' : 'Turn on'}
-            </button>
-          )}
+    </section>
+  );
+}
+
+export function NotificationSettings({
+  state,
+  serverReminders,
+  onEnable,
+  onDisable,
+}: {
+  state: PushState;
+  serverReminders: boolean | null;
+  onEnable: () => void;
+  onDisable: () => void;
+}) {
+  return (
+    <section className="max-w-2xl mx-auto rounded-2xl bg-surface border border-line shadow-card overflow-hidden">
+      <div className="p-4 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-[15px] font-semibold text-fg flex items-center gap-2">
+            <Bell className="w-4 h-4 text-muted" /> Reminders
+          </h3>
+          <p className="text-[13px] text-muted">
+            {state === 'on'
+              ? serverReminders === false
+                ? 'On. Alerts show while Apex is open; closed-app alerts need one more setup step.'
+                : 'On for this device, even when Apex is closed.'
+              : state === 'denied'
+              ? 'Blocked. Allow notifications for Apex in your device settings.'
+              : state === 'needs-install'
+              ? 'On iPhone, add Apex to your Home Screen first (Share → Add to Home Screen), then open it from there.'
+              : state === 'unsupported'
+              ? 'This browser can’t show notifications.'
+              : state === 'error'
+              ? 'Something went wrong. Try again.'
+              : 'Get a notification when a task reminder is due.'}
+          </p>
         </div>
-      )}
+        {(state === 'off' || state === 'error') && (
+          <button onClick={onEnable} className="shrink-0 min-h-[40px] px-4 rounded-xl bg-accent hover:bg-accent-strong text-white text-[14px] font-medium">
+            Turn on
+          </button>
+        )}
+        {state === 'on' && (
+          <button onClick={onDisable} className="shrink-0 min-h-[40px] px-4 rounded-xl bg-surface-2 text-fg text-[14px] font-medium">
+            Turn off
+          </button>
+        )}
+      </div>
     </section>
   );
 }

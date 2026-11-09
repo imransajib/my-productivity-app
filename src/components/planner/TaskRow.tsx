@@ -1,8 +1,9 @@
 'use client';
 
-import { Check, Trash2, Clock, CalendarClock } from 'lucide-react';
+import { Bell, Check, Trash2, Clock, CalendarClock } from 'lucide-react';
 import type { Task } from '@/lib/types';
 import { relativeDayLabel } from '@/lib/dates';
+import { reminderLabel } from '@/lib/reminders';
 import { cx } from './ui';
 
 const PRIORITY: Record<Task['priority'], { label: string; dot: string }> = {
@@ -16,13 +17,16 @@ export function TaskRow({
   task,
   onToggle,
   onDelete,
+  onEdit,
   showDate = false,
 }: {
   task: Task;
   onToggle: (id: string) => void;
   onDelete: (id: string) => void;
+  onEdit?: (task: Task) => void;
   showDate?: boolean;
 }) {
+  const reminder = reminderLabel(task);
   const p = PRIORITY[task.priority] ?? PRIORITY.medium;
   return (
     <div className="group flex items-center gap-3 p-3.5 rounded-2xl bg-surface border border-line shadow-card">
@@ -39,7 +43,7 @@ export function TaskRow({
       >
         {task.isCompleted && <Check className="w-3.5 h-3.5" strokeWidth={3} />}
       </button>
-      <div className="flex-1 min-w-0">
+      <button type="button" onClick={() => onEdit?.(task)} className="flex-1 min-w-0 text-left" aria-label={`Edit "${task.title}"`}>
         <p className={cx('text-[15px] leading-snug', task.isCompleted ? 'text-subtle line-through' : 'text-fg')}>{task.title}</p>
         <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[12.5px] text-muted tabular">
           <span className="inline-flex items-center gap-1.5">
@@ -59,8 +63,14 @@ export function TaskRow({
               {relativeDayLabel(task.dueDate)}
             </span>
           )}
+          {reminder && !task.isCompleted && (
+            <span className="inline-flex items-center gap-1 text-accent">
+              <Bell className="w-3 h-3" />
+              {reminder}
+            </span>
+          )}
         </div>
-      </div>
+      </button>
       <button
         type="button"
         onClick={() => onDelete(task.id)}

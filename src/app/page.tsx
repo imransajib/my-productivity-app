@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSession, signIn } from 'next-auth/react';
-import { BarChart3, CalendarDays, Home, ListTodo, Plus, RefreshCw, Settings, Sparkles, AlertTriangle } from 'lucide-react';
+import { BarChart3, Bell, CalendarDays, Home, ListTodo, Plus, RefreshCw, Settings, Sparkles, AlertTriangle } from 'lucide-react';
 import type { CalendarEvent, Category, Task } from '@/lib/types';
 import { DEFAULT_CATEGORIES, INITIAL_EVENTS, INITIAL_TASKS, getLocalData, saveLocalData, getUserEventStorageKey, getUserTaskStorageKey } from '@/lib/store';
-import { parseNaturalLanguageInput } from '@/lib/nlpParser';
+import { useReminders, usePush } from '@/lib/useReminders';
+import { computeReminderAt, reminderBody } from '@/lib/reminders';
 import { useCalendarSync, formatLastSynced } from '@/lib/useCalendarSync';
 import { useCloudState } from '@/lib/useCloudState';
 import { useTheme } from '@/lib/useTheme';
@@ -14,8 +15,9 @@ import { CalendarSettings } from '@/components/CalendarSettings';
 import { AppInfoSettings } from '@/components/AppInfoSettings';
 import { OnboardingModal } from '@/components/OnboardingModal';
 import { CalendarView, type CalendarMode } from '@/components/planner/CalendarView';
-import { AppearanceSettings, ReviewView, SignInCard, TasksView, TodayView } from '@/components/planner/views';
-import { Sheet, cx } from '@/components/planner/ui';
+import { AppearanceSettings, NotificationSettings, ReviewView, SignInCard, TasksView, TodayView } from '@/components/planner/views';
+import { cx } from '@/components/planner/ui';
+import { TaskComposer } from '@/components/planner/TaskComposer';
 
 type Tab = 'today' | 'calendar' | 'tasks' | 'review' | 'settings';
 
@@ -43,8 +45,10 @@ export default function PlannerApp() {
   const [tab, setTab] = useState<Tab>('today');
   const [selected, setSelected] = useState<string>(''); // set after mount (no clock reads during prerender)
   const [calendarMode, setCalendarMode] = useState<CalendarMode>('month');
-  const [quickOpen, setQuickOpen] = useState(false);
-  const [quickInput, setQuickInput] = useState('');
+  const [composer, setComposer] = useState<{ open: boolean; task: Task | null }>({ open: false, task: null });
+  const openNew = useCallback(() => setComposer({ open: true, task: null }), []);
+  const openEdit = useCallback((task: Task) => setComposer({ open: true, task }), []);
+  const [toast, setToast] = useState<{ title: string; body: string } | null>(null);
   const [greeting, setGreeting] = useState('Hello');
 
   useEffect(() => {
@@ -132,7 +136,7 @@ export default function PlannerApp() {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        setQuickOpen((o) => !o);
+        setComposer((c) => ({ open: !c.open, task: null }));
       }
     };
     window.addEventListener('keydown', onKey);
@@ -154,50 +158,41 @@ export default function PlannerApp() {
   }, []);
 
   // --- Quick add ---
-  const preview = useMemo(() => (quickInput.trim() ? parseNaturalLanguageInput(quickInput) : null), [quickInput]);
   const defaultDay = tab === 'today' || tab === 'calendar' ? selected : todayKey();
-  const submitQuickAdd = () => {
-    if (!preview || !preview.title) return;
+  const saveTask = useCallback((t: Task) => {
+    setTasks((prev) => (prev.some((x) => x.id === t.id) ? prev.map((x) => (x.id === t.id ? t : x)) : [t, ...prev]));
+  }, []);
+  const saveEvent = useCallback((e: CalendarEvent) => setEvents((prev) => [...prev, e]), []);
+
+  // Keep reminder times right after any date/time change (e.g. "Move to today")
+  useEffect(() => {
+    const stale = tasks.filter((t) => (t.reminderAt ?? null) !== computeReminderAt(t));
+    if (!stale.length) return;
     const now = new Date().toISOString();
-    const day = preview.date || defaultDay;
-    if (preview.type === 'event') {
-      const start = preview.time || '10:00';
-      const [h, m] = start.split(':').map(Number);
-      const endMin = h * 60 + m + (preview.durationMin || 60);
-      const end = `${String(Math.min(23, Math.floor(endMin / 60))).padStart(2, '0')}:${String(endMin % 60).padStart(2, '0')}`;
-      setEvents((prev) => [
-        ...prev,
-        {
-          id: `event-${Date.now()}`,
-          title: preview.title,
-          startTime: `${day}T${start}:00`,
-          endTime: `${day}T${end}:00`,
-          isAllDay: !preview.time,
-          allDay: !preview.time,
-          source: 'local',
-          calendarName: 'My calendar',
-          updatedAt: now,
-        },
-      ]);
-    } else {
-      setTasks((prev) => [
-        {
-          id: `task-${Date.now()}`,
-          title: preview.title,
-          dueDate: day,
-          scheduledTime: preview.time,
-          durationMin: preview.durationMin,
-          priority: preview.priority || 'medium',
-          isCompleted: false,
-          subtasks: [],
-          updatedAt: now,
-        },
-        ...prev,
-      ]);
-    }
-    setQuickInput('');
-    setQuickOpen(false);
-  };
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- derived field repair, converges in one pass
+    setTasks((prev) => prev.map((t) => (stale.some((x) => x.id === t.id) ? { ...t, reminderAt: computeReminderAt(t), updatedAt: now } : t)));
+  }, [tasks]);
+
+  // Reminders: in-app (while open) + push (when closed)
+  const push = usePush(status === 'authenticated');
+  useReminders(tasks, (t) => setToast({ title: t.title, body: reminderBody(t) }));
+  useEffect(() => {
+    if (!toast) return;
+    const id = window.setTimeout(() => setToast(null), 8000);
+    return () => window.clearTimeout(id);
+  }, [toast]);
+
+  // Deep links from notifications: /?tab=tasks
+  useEffect(() => {
+    const go = (url: string) => {
+      const t = new URL(url, location.origin).searchParams.get('tab') as Tab | null;
+      if (t && TABS.some((x) => x.id === t)) setTab(t);
+    };
+    go(location.href);
+    const onMsg = (e: MessageEvent) => e.data?.type === 'open' && go(e.data.url);
+    navigator.serviceWorker?.addEventListener('message', onMsg);
+    return () => navigator.serviceWorker?.removeEventListener('message', onMsg);
+  }, []);
 
   // --- Gates ---
   if (status === 'loading' || (status === 'authenticated' && !selected)) {
@@ -226,7 +221,7 @@ export default function PlannerApp() {
           <span className="text-[15px] font-semibold text-fg">Apex Planner</span>
         </div>
         <button
-          onClick={() => setQuickOpen(true)}
+          onClick={openNew}
           className="mt-5 min-h-[40px] px-3 rounded-xl bg-accent hover:bg-accent-strong text-white text-[14px] font-medium flex items-center justify-between"
         >
           <span className="flex items-center gap-2">
@@ -309,18 +304,20 @@ export default function PlannerApp() {
               onToggleTask={toggleTask}
               onDeleteTask={deleteTask}
               onMoveOverdue={moveOverdue}
-              onAdd={() => setQuickOpen(true)}
+              onAdd={openNew}
+              onEditTask={openEdit}
             />
           )}
           {tab === 'calendar' && (
             <CalendarView events={events} selected={selected} onSelect={setSelected} mode={calendarMode} onModeChange={changeCalendarMode} />
           )}
-          {tab === 'tasks' && <TasksView tasks={tasks} onToggleTask={toggleTask} onDeleteTask={deleteTask} onAdd={() => setQuickOpen(true)} />}
+          {tab === 'tasks' && <TasksView tasks={tasks} onToggleTask={toggleTask} onDeleteTask={deleteTask} onAdd={openNew} onEditTask={openEdit} />}
           {tab === 'review' && <ReviewView tasks={tasks} events={events} />}
           {tab === 'settings' && (
             <div className="space-y-5">
               <h1 className="max-w-2xl mx-auto text-[28px] md:text-[32px] font-bold tracking-tight text-fg">Settings</h1>
               <AppearanceSettings theme={theme} onTheme={setTheme} />
+              <NotificationSettings state={push.state} serverReminders={push.serverReminders} onEnable={push.enable} onDisable={push.disable} />
               <CalendarSettings
                 userEmail={userEmail}
                 googleCalendars={calendarSync.googleCalendars}
@@ -341,7 +338,7 @@ export default function PlannerApp() {
       {/* ---------- Mobile: add button + tab bar ---------- */}
       {tab !== 'settings' && tab !== 'review' && (
         <button
-          onClick={() => setQuickOpen(true)}
+          onClick={openNew}
           aria-label="Add task or event"
           className="md:hidden fixed z-30 right-4 bottom-[calc(env(safe-area-inset-bottom)+76px)] w-14 h-14 rounded-full bg-accent text-white shadow-lg shadow-accent/30 flex items-center justify-center active:scale-95 transition-transform"
         >
@@ -367,43 +364,34 @@ export default function PlannerApp() {
         </div>
       </nav>
 
-      {/* ---------- Quick add ---------- */}
-      <Sheet
-        open={quickOpen}
-        onClose={() => setQuickOpen(false)}
-        title="New"
-        footer={
-          <button
-            onClick={submitQuickAdd}
-            disabled={!preview?.title}
-            className="w-full min-h-[48px] rounded-xl bg-accent hover:bg-accent-strong text-white text-[16px] font-semibold disabled:opacity-40"
-          >
-            {preview?.title ? `Add ${preview.type}` : 'Type something to add'}
-          </button>
-        }
-      >
-        <input
-          autoFocus
-          value={quickInput}
-          onChange={(e) => setQuickInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && submitQuickAdd()}
-          placeholder='e.g. "Dentist tomorrow 3pm" or "Call mum"'
-          className="w-full min-h-[48px] px-4 rounded-xl bg-surface-2 border border-line text-fg placeholder:text-subtle focus:outline-none focus:ring-2 focus:ring-accent/40"
-        />
-        <p className="mt-2 text-[13px] text-muted">
-          Words like <b className="text-fg font-medium">meeting</b> or <b className="text-fg font-medium">call with</b> make an event. Add a day, time or <b className="text-fg font-medium">!high</b>.
-        </p>
-        {preview?.title && (
-          <div className="mt-3 p-3 rounded-xl bg-surface-2 border border-line text-[14px] space-y-1">
-            <p className="text-fg font-medium">{preview.title}</p>
-            <p className="text-muted tabular">
-              <span className="capitalize">{preview.type}</span> · {relativeDayLabel(preview.date || defaultDay)}
-              {preview.time ? ` · ${preview.time}` : ''}
-              {preview.priority ? ` · ${preview.priority}` : ''}
-            </p>
+      {/* ---------- New / edit ---------- */}
+      <TaskComposer
+        open={composer.open}
+        task={composer.task}
+        defaultDate={defaultDay}
+        onClose={() => setComposer({ open: false, task: null })}
+        onSaveTask={saveTask}
+        onDeleteTask={deleteTask}
+        onSaveEvent={saveEvent}
+      />
+
+      {toast && (
+        <div
+          role="alert"
+          className="fixed z-[70] left-4 right-4 md:left-auto md:right-6 md:w-96 top-[calc(env(safe-area-inset-top)+12px)] p-4 rounded-2xl bg-surface border border-line shadow-2xl flex items-start gap-3 animate-pop-in"
+        >
+          <span className="w-9 h-9 shrink-0 rounded-xl bg-accent-soft text-accent flex items-center justify-center">
+            <Bell className="w-4.5 h-4.5" />
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-[15px] font-semibold text-fg truncate">{toast.title}</p>
+            <p className="text-[13px] text-muted">{toast.body}</p>
           </div>
-        )}
-      </Sheet>
+          <button onClick={() => setToast(null)} className="text-[13px] font-medium text-accent min-h-[32px] px-2">
+            OK
+          </button>
+        </div>
+      )}
 
       <OnboardingModal
         isOpen={onboardingOpen}
