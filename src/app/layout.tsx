@@ -1,28 +1,27 @@
 import type { Metadata, Viewport } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Inter } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
 import { ServiceWorkerRegistrar } from '@/components/ServiceWorkerRegistrar';
 import { UpdateBanner } from '@/components/UpdateBanner';
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
+const inter = Inter({
+  variable: '--font-inter',
   subsets: ['latin'],
+  display: 'swap',
 });
 
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
-});
+// Runs before paint so the saved theme applies without a flash.
+const themeScript = `(function(){try{var p=localStorage.getItem('apex_theme')||'system';var d=p==='dark'||(p==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);var r=document.documentElement;r.dataset.theme=d?'dark':'light';r.dataset.themePref=p;var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',d?'#0b0b0f':'#f4f4f7');}catch(e){document.documentElement.dataset.theme='dark';}})();`;
 
 export const metadata: Metadata = {
-  title: 'Apex Planner | Unified Daily Personal OS',
+  title: 'Apex Planner',
   description:
     'Next-generation personal operating system integrating calendar timelines, natural language task scheduling, and weekly review analytics.',
   applicationName: 'Apex Planner',
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'black-translucent',
+    statusBarStyle: 'default',
     title: 'Apex Planner',
   },
   formatDetection: {
@@ -38,7 +37,7 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  themeColor: '#0F1117',
+  themeColor: '#0b0b0f',
 };
 
 export default function RootLayout({
@@ -47,10 +46,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark h-full">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} h-full bg-[#0F1117] text-slate-100 antialiased`}
-      >
+    <html lang="en" data-theme="dark" className={`${inter.variable} h-full`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
+      <body className="h-full bg-bg text-fg antialiased">
         <Providers>
           <ServiceWorkerRegistrar />
           <UpdateBanner />

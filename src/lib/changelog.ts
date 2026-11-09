@@ -8,6 +8,16 @@ export interface Release {
 
 export const CHANGELOG: Release[] = [
   {
+    version: '0.5.0',
+    date: '2026-11-09',
+    notes: [
+      'Redesigned for phones: new Today screen, tab bar and quick add',
+      'Calendar: Day, Week and Month views (month now works)',
+      'Each event is its own card: tap the chevron for location, Join link and notes',
+      'Light and dark mode in Settings → Appearance',
+    ],
+  },
+  {
     version: '0.4.0',
     date: '2026-11-09',
     notes: [

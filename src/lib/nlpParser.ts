@@ -1,3 +1,4 @@
+import { dateKey } from '@/lib/dates';
 import { Priority, ParsedNLPResult } from './types';
 
 export function parseNaturalLanguageInput(rawInput: string): ParsedNLPResult {
@@ -60,7 +61,7 @@ export function parseNaturalLanguageInput(rawInput: string): ParsedNLPResult {
 
   // 4. Detect Date (today, tomorrow, day of week, or YYYY-MM-DD, or MM/DD)
   const now = new Date();
-  const todayIso = now.toISOString().split('T')[0];
+  const todayIso = dateKey(now);
 
   const dateKeywords: { [k: string]: number } = {
     today: 0,
@@ -76,7 +77,7 @@ export function parseNaturalLanguageInput(rawInput: string): ParsedNLPResult {
     const offset = dateKeywords[dkMatch[1].toLowerCase()];
     const target = new Date(now);
     target.setDate(target.getDate() + offset);
-    date = target.toISOString().split('T')[0];
+    date = dateKey(target);
     text = text.replace(dkMatch[0], ' ');
   } else {
     // Check weekday (e.g. "on friday", "next monday")
@@ -89,7 +90,7 @@ export function parseNaturalLanguageInput(rawInput: string): ParsedNLPResult {
       if (dayDiff === 0) dayDiff = 7; // next week if same day
       const target = new Date(now);
       target.setDate(target.getDate() + dayDiff);
-      date = target.toISOString().split('T')[0];
+      date = dateKey(target);
       text = text.replace(wdMatch[0], ' ');
     } else {
       // Check ISO format YYYY-MM-DD

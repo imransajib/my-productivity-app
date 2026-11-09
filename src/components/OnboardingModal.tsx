@@ -124,26 +124,26 @@ export function OnboardingModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto animate-fadeIn">
-      <div className="w-full max-w-2xl bg-[#141721] border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl relative my-8">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
+      <div className="w-full max-w-2xl max-h-[92dvh] overflow-y-auto overscroll-contain bg-surface border border-line rounded-t-3xl sm:rounded-3xl p-5 sm:p-8 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-2xl relative animate-sheet-up sm:animate-pop-in">
         {/* Header */}
         <div className="flex items-center gap-3 mb-2">
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-            <Sparkles className="w-5 h-5 text-white" />
+            <Sparkles className="w-5 h-5 text-fg" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-white tracking-tight">Connect your calendars</h2>
-            <span className="text-xs text-indigo-400 font-mono">Unified Daily Timeline Setup</span>
+            <h2 className="text-xl font-bold text-fg tracking-tight">Connect your calendars</h2>
+            <span className="text-xs text-accent font-mono">Unified Daily Timeline Setup</span>
           </div>
         </div>
 
-        <p className="text-xs text-slate-400 mt-1 mb-6 leading-relaxed">
+        <p className="text-xs text-muted mt-1 mb-6 leading-relaxed">
           Apex Planner brings your daily schedule together across Google and Apple calendars with instant offline rendering and local-first privacy.
         </p>
 
         <div className="space-y-6">
           {/* ================= GOOGLE CALENDAR CARD ================= */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3">
+          <div className="p-4 sm:p-5 rounded-2xl bg-surface-2 border border-line space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
@@ -151,13 +151,13 @@ export function OnboardingModal({
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-white">Google Calendar</span>
+                    <span className="text-xs font-semibold text-fg">Google Calendar</span>
                     <span className="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                       <CheckCircle2 className="w-3 h-3" />
                       Connected
                     </span>
                   </div>
-                  <span className="text-[11px] text-slate-400 font-mono block mt-0.5">
+                  <span className="text-[11px] text-muted font-mono block mt-0.5">
                     {userEmail || 'Active account'}
                   </span>
                 </div>
@@ -165,12 +165,12 @@ export function OnboardingModal({
             </div>
 
             {/* Calendar Picker */}
-            <div className="pt-2 border-t border-slate-800/80">
-              <span className="text-[11px] font-medium text-slate-300 block mb-2">
+            <div className="pt-2 border-t border-line">
+              <span className="text-[11px] font-medium text-muted block mb-2">
                 Choose Google calendars to include:
               </span>
               {googleCalendars.length === 0 ? (
-                <div className="text-[11px] text-slate-500 italic py-1">
+                <div className="text-[11px] text-subtle italic py-1">
                   Loading discovered Google calendars...
                 </div>
               ) : (
@@ -182,15 +182,15 @@ export function OnboardingModal({
                         key={cal.id}
                         className={`flex items-center gap-2.5 p-2 rounded-xl border text-xs cursor-pointer transition-all ${
                           isChecked
-                            ? 'bg-slate-800/80 border-indigo-500/40 text-slate-200'
-                            : 'bg-slate-950/40 border-slate-800/60 text-slate-400 hover:text-slate-300'
+                            ? 'bg-surface-2 border-indigo-500/40 text-fg'
+                            : 'bg-surface-2 border-line text-muted hover:text-muted'
                         }`}
                       >
                         <input
                           type="checkbox"
                           checked={isChecked}
                           onChange={() => onToggleGoogleCalendar(cal.id)}
-                          className="rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                          className="rounded border-line bg-surface-2 text-indigo-600 focus:ring-0 focus:ring-offset-0 cursor-pointer"
                         />
                         <span
                           className="w-2.5 h-2.5 rounded-full flex-shrink-0"
@@ -198,7 +198,7 @@ export function OnboardingModal({
                         />
                         <span className="truncate">{cal.summary}</span>
                         {cal.primary && (
-                          <span className="text-[9px] font-mono text-slate-500 uppercase ml-auto">
+                          <span className="text-[9px] font-mono text-subtle uppercase ml-auto">
                             Primary
                           </span>
                         )}
@@ -211,27 +211,27 @@ export function OnboardingModal({
           </div>
 
           {/* ================= APPLE CALENDAR CARD ================= */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4">
+          <div className="p-4 sm:p-5 rounded-2xl bg-surface-2 border border-line space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-200">
+                <div className="w-9 h-9 rounded-xl bg-surface-2 border border-line flex items-center justify-center text-fg">
                   <AppleLogo className="w-4 h-4" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-white">Apple Calendar (iCloud)</span>
+                    <span className="text-xs font-semibold text-fg">Apple Calendar (iCloud)</span>
                     {appleStatus.connected ? (
                       <span className="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                         <CheckCircle2 className="w-3 h-3" />
                         Connected
                       </span>
                     ) : (
-                      <span className="text-[10px] font-mono text-slate-500 bg-slate-800/60 px-2 py-0.5 rounded border border-slate-700">
+                      <span className="text-[10px] font-mono text-subtle bg-surface-2 px-2 py-0.5 rounded border border-line">
                         Not connected
                       </span>
                     )}
                   </div>
-                  <span className="text-[11px] text-slate-400 block mt-0.5">
+                  <span className="text-[11px] text-muted block mt-0.5">
                     Sync iCloud calendars via CalDAV or subscribe to public shared feeds
                   </span>
                 </div>
@@ -239,7 +239,7 @@ export function OnboardingModal({
             </div>
 
             {appleStatus.connected ? (
-              <div className="p-3 rounded-xl bg-emerald-950/20 border border-emerald-800/40 text-xs text-emerald-300 flex items-center justify-between">
+              <div className="p-3 rounded-xl bg-emerald-950/20 border border-emerald-800/40 text-xs text-emerald-700 dark:text-emerald-300 flex items-center justify-between">
                 <span>
                   iCloud sync active ({appleStatus.method === 'caldav' ? appleStatus.email || 'CalDAV' : 'Shared Link'}).
                 </span>
@@ -248,9 +248,9 @@ export function OnboardingModal({
                 </span>
               </div>
             ) : (
-              <div className="space-y-3 pt-2 border-t border-slate-800/80">
+              <div className="space-y-3 pt-2 border-t border-line">
                 {/* Connection Method Selector */}
-                <div className="flex rounded-xl bg-slate-950 p-1 border border-slate-800 text-xs">
+                <div className="flex rounded-xl bg-surface-2 p-1 border border-line text-xs">
                   <button
                     type="button"
                     onClick={() => {
@@ -260,7 +260,7 @@ export function OnboardingModal({
                     className={`flex-1 py-1.5 px-3 rounded-lg font-medium transition-all ${
                       appleMethod === 'caldav'
                         ? 'bg-indigo-600 text-white shadow-sm'
-                        : 'text-slate-400 hover:text-slate-200'
+                        : 'text-muted hover:text-fg'
                     }`}
                   >
                     iCloud CalDAV (Recommended)
@@ -274,7 +274,7 @@ export function OnboardingModal({
                     className={`flex-1 py-1.5 px-3 rounded-lg font-medium transition-all ${
                       appleMethod === 'ics'
                         ? 'bg-indigo-600 text-white shadow-sm'
-                        : 'text-slate-400 hover:text-slate-200'
+                        : 'text-muted hover:text-fg'
                     }`}
                   >
                     Public / Shared Link (.ics)
@@ -285,56 +285,56 @@ export function OnboardingModal({
                 {appleMethod === 'caldav' ? (
                   <form onSubmit={handleConnectApple} className="space-y-3">
                     {/* Instructions Banner */}
-                    <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800/80 text-[11px] text-slate-300 space-y-1.5">
-                      <div className="flex items-center justify-between font-semibold text-slate-200">
+                    <div className="p-3 rounded-xl bg-surface-2 border border-line text-[11px] text-muted space-y-1.5">
+                      <div className="flex items-center justify-between font-semibold text-fg">
                         <span>Apple ID App-Specific Password</span>
                         <a
                           href="https://account.apple.com/account/manage"
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-indigo-400 hover:text-indigo-300 flex items-center gap-1 font-mono text-[10px]"
+                          className="text-accent hover:text-accent flex items-center gap-1 font-mono text-[10px]"
                         >
                           <span>account.apple.com</span>
                           <ExternalLink className="w-3 h-3" />
                         </a>
                       </div>
-                      <p className="text-slate-400 leading-relaxed">
+                      <p className="text-muted leading-relaxed">
                         Apple does not support OAuth for third-party calendars. Generate a secure app password:
                       </p>
-                      <ol className="list-decimal list-inside text-slate-400 space-y-0.5 pl-1">
-                        <li>Sign in to <span className="text-slate-200">account.apple.com</span></li>
-                        <li>Navigate to <span className="text-slate-200">Sign-In and Security</span> → <span className="text-slate-200">App-Specific Passwords</span></li>
-                        <li>Create a password for <span className="text-slate-200">Apex Planner</span> and paste it below.</li>
+                      <ol className="list-decimal list-inside text-muted space-y-0.5 pl-1">
+                        <li>Sign in to <span className="text-fg">account.apple.com</span></li>
+                        <li>Navigate to <span className="text-fg">Sign-In and Security</span> → <span className="text-fg">App-Specific Passwords</span></li>
+                        <li>Create a password for <span className="text-fg">Apex Planner</span> and paste it below.</li>
                       </ol>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                       <div>
-                        <label className="text-[10px] uppercase font-mono text-slate-400 mb-1 block">Apple ID Email</label>
+                        <label className="text-[10px] uppercase font-mono text-muted mb-1 block">Apple ID Email</label>
                         <input
                           type="email"
                           required
                           value={appleEmail}
                           onChange={(e) => setAppleEmail(e.target.value)}
                           placeholder="name@icloud.com"
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500"
+                          className="w-full bg-surface-2 border border-line rounded-xl px-3 py-2 text-xs text-fg placeholder:text-subtle focus:outline-none focus:border-accent"
                         />
                       </div>
                       <div>
-                        <label className="text-[10px] uppercase font-mono text-slate-400 mb-1 block">App-Specific Password</label>
+                        <label className="text-[10px] uppercase font-mono text-muted mb-1 block">App-Specific Password</label>
                         <input
                           type="password"
                           required
                           value={applePassword}
                           onChange={(e) => setApplePassword(e.target.value)}
                           placeholder="xxxx-xxxx-xxxx-xxxx"
-                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 font-mono"
+                          className="w-full bg-surface-2 border border-line rounded-xl px-3 py-2 text-xs text-fg placeholder:text-subtle focus:outline-none focus:border-accent font-mono"
                         />
                       </div>
                     </div>
 
                     {appleError && (
-                      <div className="flex items-center gap-2 p-2.5 rounded-xl bg-red-950/30 border border-red-800/40 text-red-300 text-xs">
+                      <div className="flex items-center gap-2 p-2.5 rounded-xl bg-red-950/30 border border-red-800/40 text-red-700 dark:text-red-300 text-xs">
                         <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
                         <span>{appleError}</span>
                       </div>
@@ -343,7 +343,7 @@ export function OnboardingModal({
                     <button
                       type="submit"
                       disabled={isSubmittingApple}
-                      className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-[0.98] text-white text-xs font-semibold transition-all flex items-center gap-2 disabled:opacity-50"
+                      className="px-4 py-2 rounded-xl bg-surface-2 hover:bg-surface-3 active:scale-[0.98] text-fg text-xs font-semibold transition-all flex items-center gap-2 disabled:opacity-50"
                     >
                       {isSubmittingApple ? (
                         <>
@@ -358,27 +358,27 @@ export function OnboardingModal({
                 ) : (
                   /* Shared Link Form */
                   <form onSubmit={handleConnectApple} className="space-y-3">
-                    <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800/80 text-[11px] text-slate-400 space-y-1">
-                      <span className="font-semibold text-slate-200 block">Public iCloud Calendar Share</span>
+                    <div className="p-3 rounded-xl bg-surface-2 border border-line text-[11px] text-muted space-y-1">
+                      <span className="font-semibold text-fg block">Public iCloud Calendar Share</span>
                       <p>
-                        In Apple Calendar on macOS or iOS: click the calendar share icon → turn on <span className="text-slate-200">Public Calendar</span> → copy the link.
+                        In Apple Calendar on macOS or iOS: click the calendar share icon → turn on <span className="text-fg">Public Calendar</span> → copy the link.
                       </p>
                     </div>
 
                     <div>
-                      <label className="text-[10px] uppercase font-mono text-slate-400 mb-1 block">Webcal / ICS URL</label>
+                      <label className="text-[10px] uppercase font-mono text-muted mb-1 block">Webcal / ICS URL</label>
                       <input
                         type="text"
                         required
                         value={appleIcsUrl}
                         onChange={(e) => setAppleIcsUrl(e.target.value)}
                         placeholder="webcal://p64-caldav.icloud.com/published/2/..."
-                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 font-mono"
+                        className="w-full bg-surface-2 border border-line rounded-xl px-3 py-2 text-xs text-fg placeholder:text-subtle focus:outline-none focus:border-accent font-mono"
                       />
                     </div>
 
                     {appleError && (
-                      <div className="flex items-center gap-2 p-2.5 rounded-xl bg-red-950/30 border border-red-800/40 text-red-300 text-xs">
+                      <div className="flex items-center gap-2 p-2.5 rounded-xl bg-red-950/30 border border-red-800/40 text-red-700 dark:text-red-300 text-xs">
                         <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
                         <span>{appleError}</span>
                       </div>
@@ -387,7 +387,7 @@ export function OnboardingModal({
                     <button
                       type="submit"
                       disabled={isSubmittingApple}
-                      className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-[0.98] text-white text-xs font-semibold transition-all flex items-center gap-2 disabled:opacity-50"
+                      className="px-4 py-2 rounded-xl bg-surface-2 hover:bg-surface-3 active:scale-[0.98] text-fg text-xs font-semibold transition-all flex items-center gap-2 disabled:opacity-50"
                     >
                       {isSubmittingApple ? (
                         <>
@@ -406,11 +406,11 @@ export function OnboardingModal({
         </div>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-between mt-8 pt-4 border-t border-slate-800">
+        <div className="flex items-center justify-between mt-8 pt-4 border-t border-line">
           <button
             type="button"
             onClick={onClose}
-            className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+            className="text-xs text-subtle hover:text-muted transition-colors"
           >
             Skip for now
           </button>

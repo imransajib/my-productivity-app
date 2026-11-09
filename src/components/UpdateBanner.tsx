@@ -11,16 +11,16 @@ export function UpdateBanner() {
   return (
     <div
       role="status"
-      className="fixed z-[60] left-4 right-4 md:left-auto md:right-6 md:w-96 top-[calc(env(safe-area-inset-top)+12px)] rounded-2xl border border-indigo-500/30 bg-[#161a2b]/95 backdrop-blur-xl shadow-2xl p-4"
+      className="fixed z-[60] left-4 right-4 md:left-auto md:right-6 md:w-96 top-[calc(env(safe-area-inset-top)+12px)] rounded-2xl border border-indigo-500/30 bg-surface/95 backdrop-blur-xl shadow-2xl p-4"
     >
       <div className="flex items-start gap-3">
         <div className="w-9 h-9 shrink-0 rounded-xl bg-indigo-500/15 flex items-center justify-center">
-          <Sparkles className="w-4.5 h-4.5 text-indigo-300" />
+          <Sparkles className="w-4.5 h-4.5 text-accent" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-white">Update available · v{remote.version}</p>
+          <p className="text-sm font-semibold text-fg">Update available · v{remote.version}</p>
           {remote.notes?.length > 0 && (
-            <ul className="mt-1 space-y-0.5 text-xs text-slate-400">
+            <ul className="mt-1 space-y-0.5 text-xs text-muted">
               {remote.notes.slice(0, 3).map((n) => (
                 <li key={n}>• {n}</li>
               ))}
@@ -34,12 +34,12 @@ export function UpdateBanner() {
             >
               {state === 'installing' ? 'Updating…' : 'Update now'}
             </button>
-            <button onClick={later} className="min-h-[40px] px-4 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-800">
+            <button onClick={later} className="min-h-[40px] px-4 rounded-xl text-sm font-medium text-muted hover:bg-surface-3">
               Later
             </button>
           </div>
         </div>
-        <button onClick={later} aria-label="Dismiss update" className="p-1 -m-1 text-slate-500 hover:text-slate-300">
+        <button onClick={later} aria-label="Dismiss update" className="p-1 -m-1 text-subtle hover:text-muted">
           <X className="w-4 h-4" />
         </button>
       </div>

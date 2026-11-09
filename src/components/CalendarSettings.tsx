@@ -25,9 +25,9 @@ interface Props {
 
 function StatusPill({ tone, label }: { tone: 'ok' | 'warn' | 'off'; label: string }) {
   const styles = {
-    ok: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20',
-    warn: 'bg-amber-500/10 text-amber-300 border-amber-500/20',
-    off: 'bg-slate-800 text-slate-400 border-slate-700',
+    ok: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20',
+    warn: 'bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20',
+    off: 'bg-surface-2 text-muted border-line',
   }[tone];
   return (
     <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[11px] font-medium ${styles}`}>
@@ -44,11 +44,11 @@ function Toggle({ checked, color, label, onChange }: { checked: boolean; color?:
       role="switch"
       aria-checked={checked}
       onClick={onChange}
-      className="w-full flex items-center gap-3 min-h-[44px] px-3 rounded-xl hover:bg-slate-800/60 text-left"
+      className="w-full flex items-center gap-3 min-h-[44px] px-3 rounded-xl hover:bg-surface-3 text-left"
     >
       <span className="w-3 h-3 rounded-full shrink-0" style={{ background: color || '#6366f1' }} />
-      <span className="flex-1 text-sm text-slate-200 truncate">{label}</span>
-      <span className={`w-10 h-6 rounded-full p-0.5 transition-colors ${checked ? 'bg-indigo-500' : 'bg-slate-700'}`}>
+      <span className="flex-1 text-sm text-fg truncate">{label}</span>
+      <span className={`w-10 h-6 rounded-full p-0.5 transition-colors ${checked ? 'bg-indigo-500' : 'bg-surface-3'}`}>
         <span className={`block w-5 h-5 rounded-full bg-white transition-transform ${checked ? 'translate-x-4' : ''}`} />
       </span>
     </button>
@@ -103,12 +103,12 @@ export function CalendarSettings({
       {/* Sync header */}
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-white">Calendars</h2>
-          <p className="text-sm text-slate-400">{formatLastSynced(status.lastSyncedAt)} · auto-syncs every 5 min</p>
-          <p className="text-xs mt-0.5 flex items-center gap-1.5 text-slate-500">
+          <h2 className="text-lg font-semibold text-fg">Calendars</h2>
+          <p className="text-sm text-muted">{formatLastSynced(status.lastSyncedAt)} · auto-syncs every 5 min</p>
+          <p className="text-xs mt-0.5 flex items-center gap-1.5 text-subtle">
             <span
               className={`w-1.5 h-1.5 rounded-full ${
-                cloudStatus === 'synced' ? 'bg-emerald-400' : cloudStatus === 'syncing' ? 'bg-amber-400 animate-pulse' : 'bg-slate-600'
+                cloudStatus === 'synced' ? 'bg-emerald-400' : cloudStatus === 'syncing' ? 'bg-amber-400 animate-pulse' : 'bg-line-strong'
               }`}
             />
             {cloudStatus === 'synced'
@@ -123,7 +123,7 @@ export function CalendarSettings({
         <button
           onClick={onSyncNow}
           disabled={status.isSyncing}
-          className="min-h-[44px] px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm font-medium text-white flex items-center gap-2 disabled:opacity-60"
+          className="shrink-0 whitespace-nowrap min-h-[44px] px-4 rounded-xl bg-accent hover:bg-accent-strong text-sm font-medium text-white flex items-center gap-2 disabled:opacity-60"
         >
           <RefreshCw className={`w-4 h-4 ${status.isSyncing ? 'animate-spin' : ''}`} />
           {status.isSyncing ? 'Syncing…' : 'Sync now'}
@@ -131,16 +131,16 @@ export function CalendarSettings({
       </div>
 
       {/* Google */}
-      <section className="rounded-2xl bg-[#141721] border border-slate-800 overflow-hidden">
-        <div className="p-4 flex items-center justify-between gap-3 border-b border-slate-800">
+      <section className="rounded-2xl bg-surface border border-line overflow-hidden">
+        <div className="p-4 flex items-center justify-between gap-3 border-b border-line">
           <div className="min-w-0">
-            <h3 className="text-sm font-semibold text-white">Google Calendar</h3>
-            <p className="text-xs text-slate-400 truncate">{userEmail}</p>
+            <h3 className="text-sm font-semibold text-fg">Google Calendar</h3>
+            <p className="text-xs text-muted truncate">{userEmail}</p>
           </div>
           <StatusPill tone={googleTone} label={googleLabel} />
         </div>
         {(status.googleReconnect || status.googleError) && (
-          <div className="px-4 py-3 bg-amber-500/5 flex items-center gap-3 text-xs text-amber-200">
+          <div className="px-4 py-3 bg-amber-500/5 flex items-center gap-3 text-xs text-amber-700 dark:text-amber-200">
             <AlertTriangle className="w-4 h-4 shrink-0" />
             <span className="flex-1">{status.googleReconnect ? 'Google access expired.' : status.googleError}</span>
             <button onClick={() => signIn('google')} className="min-h-[36px] px-3 rounded-lg bg-amber-500/20 font-medium">
@@ -150,7 +150,7 @@ export function CalendarSettings({
         )}
         <div className="p-2">
           {googleCalendars.length === 0 ? (
-            <p className="px-3 py-3 text-sm text-slate-500">Calendars appear here after the first sync.</p>
+            <p className="px-3 py-3 text-sm text-subtle">Calendars appear here after the first sync.</p>
           ) : (
             googleCalendars.map((cal) => (
               <Toggle
@@ -166,11 +166,11 @@ export function CalendarSettings({
       </section>
 
       {/* Apple */}
-      <section className="rounded-2xl bg-[#141721] border border-slate-800 overflow-hidden">
-        <div className="p-4 flex items-center justify-between gap-3 border-b border-slate-800">
+      <section className="rounded-2xl bg-surface border border-line overflow-hidden">
+        <div className="p-4 flex items-center justify-between gap-3 border-b border-line">
           <div className="min-w-0">
-            <h3 className="text-sm font-semibold text-white">Apple Calendar</h3>
-            <p className="text-xs text-slate-400 truncate">
+            <h3 className="text-sm font-semibold text-fg">Apple Calendar</h3>
+            <p className="text-xs text-muted truncate">
               {apple.connected
                 ? apple.method === 'caldav'
                   ? `iCloud · ${apple.email ?? ''}`
@@ -181,7 +181,7 @@ export function CalendarSettings({
           <StatusPill tone={appleTone} label={appleLabel} />
         </div>
         {status.appleError && apple.connected && (
-          <div className="px-4 py-3 bg-amber-500/5 flex items-center gap-3 text-xs text-amber-200">
+          <div className="px-4 py-3 bg-amber-500/5 flex items-center gap-3 text-xs text-amber-700 dark:text-amber-200">
             <AlertTriangle className="w-4 h-4 shrink-0" />
             <span className="flex-1">{status.appleError}</span>
           </div>
@@ -200,7 +200,7 @@ export function CalendarSettings({
           <div className="flex flex-col sm:flex-row gap-2 p-2">
             <button
               onClick={onAddApple}
-              className="flex-1 min-h-[44px] rounded-xl bg-slate-800 hover:bg-slate-700 text-sm font-medium text-slate-100 flex items-center justify-center gap-2"
+              className="flex-1 min-h-[44px] rounded-xl bg-surface-2 hover:bg-surface-3 text-sm font-medium text-fg flex items-center justify-center gap-2"
             >
               {apple.connected ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
               {apple.connected ? 'Change Apple connection' : 'Connect Apple Calendar'}
@@ -209,7 +209,7 @@ export function CalendarSettings({
               <button
                 onClick={disconnectApple}
                 disabled={busy}
-                className="min-h-[44px] px-4 rounded-xl border border-slate-700 text-sm font-medium text-slate-300 hover:bg-slate-800 flex items-center justify-center gap-2 disabled:opacity-60"
+                className="min-h-[44px] px-4 rounded-xl border border-line text-sm font-medium text-muted hover:bg-surface-3 flex items-center justify-center gap-2 disabled:opacity-60"
               >
                 <Unplug className="w-4 h-4" /> Disconnect
               </button>
@@ -220,7 +220,7 @@ export function CalendarSettings({
 
       <button
         onClick={() => signOut()}
-        className="w-full min-h-[44px] rounded-xl border border-slate-800 text-sm font-medium text-slate-300 hover:bg-slate-800/60 flex items-center justify-center gap-2"
+        className="w-full min-h-[44px] rounded-xl border border-line text-sm font-medium text-muted hover:bg-surface-3 flex items-center justify-center gap-2"
       >
         <LogOut className="w-4 h-4" /> Sign out
       </button>
