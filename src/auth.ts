@@ -89,7 +89,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     async session({ session, token }) {
       if (token) {
-        session.accessToken = token.access_token as string | undefined;
+        // Do NOT expose accessToken to browser session for security.
+        // Server routes access it directly from JWT.
         session.error = token.error as string | undefined;
       }
       return session;

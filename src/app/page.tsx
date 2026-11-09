@@ -250,12 +250,14 @@ export default function PlannerApp() {
     }
   }, [status]);
 
-  // Trigger Google Calendar sync on sign-in
+  // Trigger Google Calendar sync on sign-in.
+  // accessToken is never exposed to the browser session for security;
+  // the server-side API route reads it directly from the JWT cookie.
   useEffect(() => {
-    if (status === 'authenticated' && session?.accessToken) {
+    if (status === 'authenticated') {
       syncGoogleCalendar();
     }
-  }, [status, session?.accessToken, syncGoogleCalendar]);
+  }, [status, syncGoogleCalendar]);
 
   // Global Quick Capture shortcut: Cmd+K / Ctrl+K
   useEffect(() => {

@@ -2,57 +2,51 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { extractMeetingInfo, cleanLocation } from "@/lib/meetingLinks";
 import { CalendarEvent } from "@/lib/types";
+import { getGoogleAccessToken } from "@/lib/googleToken";
 
 export async function GET(request: NextRequest) {
+  // Call auth before the try block so Next.js dynamic-rendering bailouts are not swallowed
+  const session = await auth();
+
+  if (!session?.user) {
+    return NextResponse.json(
+      { error: "Unauthorized: Please sign in to access calendar events." },
+      { status: 401 }
+    );
+  }
+
+  if (session.error === "RefreshAccessTokenError") {
+    return NextResponse.json(
+      {
+        error: "Google authentication token expired. Please reconnect your Google account.",
+        reconnectRequired: true,
+      },
+      { status: 401 }
+    );
+  }
+
+  // Retrieve access token securely server-side from JWT cookie
+  const tokenResult = await getGoogleAccessToken(request);
+  if (!tokenResult.accessToken) {
+    return NextResponse.json(
+      {
+        error: tokenResult.error || "No valid Google access token available.",
+        reconnectRequired: tokenResult.reconnectRequired ?? true,
+      },
+      { status: 401 }
+    );
+  }
+
+  const accessToken = tokenResult.accessToken;
+
   try {
-    const session = await auth();
-
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: "Unauthorized: Please sign in to access calendar events." },
-        { status: 401 }
-      );
-    }
-
-    if (session.error === "RefreshAccessTokenError") {
-      return NextResponse.json(
-        {
-          error: "Google authentication token expired. Please reconnect your Google account.",
-          reconnectRequired: true,
-        },
-        { status: 401 }
-      );
-    }
-
-    const accessToken = session.accessToken;
-    if (!accessToken) {
-      return NextResponse.json(
-        {
-          error: "No Google access token found in session. Please sign in again.",
-          reconnectRequired: true,
-        },
-        { status: 401 }
-      );
-    }
-
     const { searchParams } = new URL(request.url);
     const fromParam = searchParams.get("from");
     const toParam = searchParams.get("to");
+    const requestedCalendarsParam = searchParams.get("calendars");
+    const calendarsOnly = searchParams.get("calendarsOnly") === "true";
 
-    // Standardize timeMin and timeMax as RFC3339 timestamps
-    const now = new Date();
-    const defaultFrom = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-    const defaultTo = new Date(now.getFullYear(), now.getMonth() + 2, 0).toISOString();
-
-    const timeMin = fromParam && !isNaN(new Date(fromParam).getTime())
-      ? new Date(fromParam).toISOString()
-      : defaultFrom;
-
-    const timeMax = toParam && !isNaN(new Date(toParam).getTime())
-      ? new Date(toParam).toISOString()
-      : defaultTo;
-
-    // 1. Fetch user's calendar list
+    // 1. Fetch user's calendar list from Google Calendar API
     const calendarListRes = await fetch(
       "https://www.googleapis.com/calendar/v3/users/me/calendarList",
       {
@@ -85,11 +79,48 @@ export async function GET(request: NextRequest) {
     const calendarListData = await calendarListRes.json();
     const allCalendars: any[] = calendarListData.items || [];
 
-    // Filter to selected, non-hidden calendars
-    let selectedCalendars = allCalendars.filter((cal) => !cal.hidden && cal.selected !== false);
+    const availableCalendars = allCalendars.map((cal) => ({
+      id: cal.id,
+      summary: cal.summary || "Untitled Calendar",
+      primary: Boolean(cal.primary),
+      backgroundColor: cal.backgroundColor || "#4285F4",
+      selected: Boolean(!cal.hidden && cal.selected !== false),
+    }));
+
+    if (calendarsOnly) {
+      return NextResponse.json({ calendars: availableCalendars });
+    }
+
+    // Filter to selected calendars based on query parameter or defaults
+    let selectedCalendars: any[] = [];
+    if (requestedCalendarsParam) {
+      const requestedIds = requestedCalendarsParam
+        .split(",")
+        .map((s) => decodeURIComponent(s.trim()))
+        .filter(Boolean);
+      selectedCalendars = allCalendars.filter((cal) => requestedIds.includes(cal.id));
+    }
+
+    if (selectedCalendars.length === 0) {
+      selectedCalendars = allCalendars.filter((cal) => !cal.hidden && cal.selected !== false);
+    }
+
     if (selectedCalendars.length === 0 && allCalendars.length > 0) {
       selectedCalendars = allCalendars.slice(0, 1);
     }
+
+    // Standardize timeMin and timeMax as RFC3339 timestamps
+    const now = new Date();
+    const defaultFrom = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+    const defaultTo = new Date(now.getFullYear(), now.getMonth() + 2, 28).toISOString();
+
+    const timeMin = fromParam && !isNaN(new Date(fromParam).getTime())
+      ? new Date(fromParam).toISOString()
+      : defaultFrom;
+
+    const timeMax = toParam && !isNaN(new Date(toParam).getTime())
+      ? new Date(toParam).toISOString()
+      : defaultTo;
 
     // 2. Fetch events for each selected calendar concurrently
     const eventFetchPromises = selectedCalendars.map(async (cal) => {
@@ -138,7 +169,24 @@ export async function GET(request: NextRequest) {
 
       const isAllDay = Boolean(item.start?.date && !item.start?.dateTime);
       let startTime = item.start?.dateTime || (item.start?.date ? `${item.start.date}T00:00:00` : "");
-      let endTime = item.end?.dateTime || (item.end?.date ? `${item.end.date}T23:59:59` : "");
+      let endTime = item.end?.dateTime || "";
+
+      // Fix for all-day Google events:
+      // In Google Calendar API, end.date is EXCLUSIVE (e.g., Nov 9 event has end.date = '2026-11-10').
+      // Subtract 1 day to set end = end.date minus one day at 23:59:59 so a 1-day event does not span two days.
+      if (isAllDay && item.end?.date) {
+        const endDateObj = new Date(`${item.end.date}T00:00:00Z`);
+        endDateObj.setUTCDate(endDateObj.getUTCDate() - 1);
+        const ey = endDateObj.getUTCFullYear();
+        const em = String(endDateObj.getUTCMonth() + 1).padStart(2, "0");
+        const ed = String(endDateObj.getUTCDate()).padStart(2, "0");
+        endTime = `${ey}-${em}-${ed}T23:59:59`;
+        if (endTime < startTime) {
+          endTime = `${item.start.date}T23:59:59`;
+        }
+      } else if (!endTime && item.end?.date) {
+        endTime = `${item.end.date}T23:59:59`;
+      }
 
       if (!startTime) continue;
       if (!endTime) {
@@ -183,7 +231,10 @@ export async function GET(request: NextRequest) {
       (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
     );
 
-    return NextResponse.json({ events: normalisedEvents });
+    return NextResponse.json({
+      calendars: availableCalendars,
+      events: normalisedEvents,
+    });
   } catch (error: any) {
     console.error("Unhandled exception in /api/calendar/google:", error);
     return NextResponse.json(

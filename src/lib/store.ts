@@ -108,6 +108,33 @@ export function getUserEventStorageKey(email?: string | null): string {
   return `daily_os_events_${sanitized}`;
 }
 
+/**
+ * Derives a user-namespaced localStorage key for onboarding status.
+ */
+export function getUserOnboardingKey(email?: string | null): string {
+  if (!email) return 'apex_onboarding_completed';
+  const sanitized = email.toLowerCase().replace(/[^a-z0-9_.-]/g, '_');
+  return `apex_onboarding_completed_${sanitized}`;
+}
+
+/**
+ * Derives a user-namespaced localStorage key for selected Google calendar IDs.
+ */
+export function getUserGoogleSelectedCalendarsKey(email?: string | null): string {
+  if (!email) return 'apex_google_calendars';
+  const sanitized = email.toLowerCase().replace(/[^a-z0-9_.-]/g, '_');
+  return `apex_google_calendars_${sanitized}`;
+}
+
+/**
+ * Derives a user-namespaced localStorage key for last sync timestamp.
+ */
+export function getUserLastSyncedKey(email?: string | null): string {
+  if (!email) return 'apex_last_synced';
+  const sanitized = email.toLowerCase().replace(/[^a-z0-9_.-]/g, '_');
+  return `apex_last_synced_${sanitized}`;
+}
+
 export function getLocalData<T>(key: string, fallback: T): T {
   if (typeof window === 'undefined') return fallback;
   try {
