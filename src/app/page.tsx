@@ -43,7 +43,9 @@ import {
   getUserEventStorageKey,
 } from '@/lib/store';
 import { parseNaturalLanguageInput } from '@/lib/nlpParser';
-import { parseICS, fetchGoogleCalendarEvents } from '@/lib/calendarSync';
+import { useCalendarSync, formatLastSynced } from '@/lib/useCalendarSync';
+import { CalendarSettings } from '@/components/CalendarSettings';
+import { OnboardingModal } from '@/components/OnboardingModal';
 import { getMapsSearchUrl, getProviderDisplayName } from '@/lib/meetingLinks';
 
 /**
@@ -190,7 +192,6 @@ export default function PlannerApp() {
   const [calendarView, setCalendarView] = useState<'month' | 'week' | 'agenda'>('week');
   const [filterPriority, setFilterPriority] = useState<string>('all');
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
-  const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
 
   // Initialize client-side current date after mount
@@ -216,48 +217,39 @@ export default function PlannerApp() {
   useEffect(() => { saveLocalData(eventStorageKey, events); }, [eventStorageKey, events]);
   useEffect(() => { saveLocalData('daily_os_categories', categories); }, [categories]);
 
-  // Google Calendar Real Sync Function
-  const syncGoogleCalendar = useCallback(async () => {
-    if (status !== 'authenticated') return;
-    setIsSyncing(true);
-    setSyncNotice('Syncing Google Calendar...');
-    try {
-      const now = new Date();
-      // Range: 1 month back to 2 months forward
-      const from = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
-      const to = new Date(now.getFullYear(), now.getMonth() + 2, 28).toISOString();
+  // Google + Apple sync engine (cache, focus, 5-min interval, manual)
+  const calendarSync = useCalendarSync(userEmail, status === 'authenticated');
+  const { status: syncStatus, syncNow } = calendarSync;
+  const isSyncing = syncStatus.isSyncing;
+  const syncGoogleCalendar = syncNow;
 
-      const result = await fetchGoogleCalendarEvents({ from, to });
-
-      if (result.reconnectRequired) {
-        setSyncError('Google session expired. Please reconnect your account.');
-      } else if (result.error) {
-        setSyncError(result.error);
-      } else {
-        setSyncError(null);
-        // Replace all Google-sourced events, preserving local and Apple feeds
-        setEvents((prev) => {
-          const nonGoogle = prev.filter((e) => e.source !== 'google');
-          return [...nonGoogle, ...result.events];
-        });
-        setSyncNotice(`Synced ${result.events.length} Google event(s)`);
-        setTimeout(() => setSyncNotice(null), 3500);
-      }
-    } catch (err: any) {
-      setSyncError('Failed to sync Google Calendar');
-    } finally {
-      setIsSyncing(false);
-    }
-  }, [status]);
-
-  // Trigger Google Calendar sync on sign-in.
-  // accessToken is never exposed to the browser session for security;
-  // the server-side API route reads it directly from the JWT cookie.
+  // Merge remote events (Google/Apple, read-only) with local ones
   useEffect(() => {
-    if (status === 'authenticated') {
-      syncGoogleCalendar();
-    }
-  }, [status, syncGoogleCalendar]);
+    if (!syncStatus.lastSyncedAt) return;
+    setEvents((prev) => [
+      ...prev.filter((e) => e.source !== 'google' && e.source !== 'apple'),
+      ...calendarSync.syncedEvents,
+    ]);
+  }, [calendarSync.syncedEvents, syncStatus.lastSyncedAt]);
+
+  useEffect(() => {
+    setSyncError(syncStatus.googleReconnect ? 'Google session expired. Please reconnect your account.' : syncStatus.googleError);
+  }, [syncStatus.googleReconnect, syncStatus.googleError]);
+
+  // First-run onboarding: connect calendars
+  const onboardedKey = `apex_onboarded_${userEmail ?? 'anon'}`;
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+  useEffect(() => {
+    if (status !== 'authenticated' || !userEmail) return;
+    try {
+      if (!localStorage.getItem(onboardedKey)) setIsOnboardingOpen(true);
+    } catch { /* storage blocked: skip onboarding */ }
+  }, [status, userEmail, onboardedKey]);
+  const closeOnboarding = () => {
+    try { localStorage.setItem(onboardedKey, '1'); } catch { /* ignore */ }
+    setIsOnboardingOpen(false);
+    syncNow();
+  };
 
   // Global Quick Capture shortcut: Cmd+K / Ctrl+K
   useEffect(() => {
@@ -605,7 +597,7 @@ export default function PlannerApp() {
         <div className="mt-3 pt-2 border-t border-slate-800/80 flex items-center justify-between px-2 text-[11px] text-slate-500">
           <div className="flex items-center gap-1.5">
             <span className={`w-2 h-2 rounded-full ${isSyncing ? 'bg-amber-400 animate-ping' : 'bg-emerald-500 animate-pulse'}`} />
-            <span className="truncate">{isSyncing ? 'Syncing...' : 'Google Synced'}</span>
+            <span className="truncate">{isSyncing ? 'Syncing...' : formatLastSynced(syncStatus.lastSyncedAt)}</span>
           </div>
           <button
             onClick={() => syncGoogleCalendar()}
@@ -743,9 +735,9 @@ export default function PlannerApp() {
                 <div className="p-5 rounded-2xl bg-[#141721] border border-slate-800/80 flex flex-col justify-between">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider font-mono">Up Next</span>
-                    {todayEvents.length > 0 && todayEvents[0].source === 'google' && (
-                      <span className="text-[10px] font-mono text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20">
-                        Google Calendar
+                    {todayEvents.length > 0 && (todayEvents[0].source === 'google' || todayEvents[0].source === 'apple') && (
+                      <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${todayEvents[0].source === 'apple' ? 'text-rose-300 bg-rose-500/10 border-rose-500/20' : 'text-blue-400 bg-blue-500/10 border-blue-500/20'}`}>
+                        {todayEvents[0].source === 'apple' ? 'Apple Calendar' : 'Google Calendar'}
                       </span>
                     )}
                   </div>
@@ -832,7 +824,7 @@ export default function PlannerApp() {
                           <div
                             className={`absolute -left-[23px] top-1 w-3.5 h-3.5 rounded-full border-2 border-[#141721] ${
                               item.type === 'event'
-                                ? item.source === 'google' ? 'bg-blue-500' : 'bg-indigo-500'
+                                ? item.source === 'google' ? 'bg-blue-500' : item.source === 'apple' ? 'bg-rose-500' : 'bg-indigo-500'
                                 : item.isCompleted
                                 ? 'bg-emerald-500'
                                 : 'bg-amber-500'
@@ -857,6 +849,8 @@ export default function PlannerApp() {
                                 className={`mt-0.5 p-0.5 rounded ${
                                   item.source === 'google'
                                     ? 'bg-blue-500/15 text-blue-400'
+                                    : item.source === 'apple'
+                                    ? 'bg-rose-500/15 text-rose-300'
                                     : 'bg-indigo-500/10 text-indigo-400'
                                 }`}
                               >
@@ -891,6 +885,11 @@ export default function PlannerApp() {
                                 {item.source === 'google' && (
                                   <span className="text-[9px] font-mono text-blue-400 bg-blue-500/10 border border-blue-500/20 px-1.5 py-0.5 rounded">
                                     Google Calendar (read-only)
+                                  </span>
+                                )}
+                                {item.source === 'apple' && (
+                                  <span className="text-[9px] font-mono text-rose-300 bg-rose-500/10 border border-rose-500/20 px-1.5 py-0.5 rounded">
+                                    Apple Calendar (read-only)
                                   </span>
                                 )}
                               </div>
@@ -1017,6 +1016,8 @@ export default function PlannerApp() {
                                 className={`p-1.5 rounded-lg border text-[10px] leading-tight ${
                                   ev.source === 'google'
                                     ? 'bg-blue-500/15 border-blue-500/30 text-blue-200'
+                                    : ev.source === 'apple'
+                                    ? 'bg-rose-500/15 border-rose-500/30 text-rose-200'
                                     : 'bg-indigo-500/15 border-indigo-500/30 text-indigo-200'
                                 }`}
                               >
@@ -1026,6 +1027,9 @@ export default function PlannerApp() {
                                   </span>
                                   {ev.source === 'google' && (
                                     <span className="text-[8px] font-mono text-blue-400 uppercase">GCal</span>
+                                  )}
+                                  {ev.source === 'apple' && (
+                                    <span className="text-[8px] font-mono text-rose-300 uppercase">Apple</span>
                                   )}
                                 </div>
                                 <span className="truncate block font-medium mt-0.5">{ev.title}</span>
@@ -1219,93 +1223,16 @@ export default function PlannerApp() {
 
           {/* ================= SETTINGS & CALENDAR INTEGRATIONS ================= */}
           {activeTab === 'settings' && (
-            <div className="max-w-4xl mx-auto space-y-6">
-              <div>
-                <h2 className="text-base font-semibold text-white">Integrations & External Calendars</h2>
-                <p className="text-xs text-slate-400">Directly sync Google Calendar and Apple Calendar feeds (RFC 5545)</p>
-              </div>
-
-              {/* Google Calendar Section */}
-              <div className="p-5 rounded-2xl bg-[#141721] border border-slate-800 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center font-bold text-blue-400 text-base">
-                      <GoogleLogo className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="text-xs font-semibold text-white">Google Calendar API (OAuth 2.0)</h3>
-                      <p className="text-[11px] text-slate-400">
-                        Connected as <span className="text-slate-200 font-mono">{session.user?.email}</span>
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => syncGoogleCalendar()}
-                      disabled={isSyncing}
-                      className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-xs font-medium text-white transition-all shadow-md flex items-center gap-1.5 disabled:opacity-50"
-                    >
-                      <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                      <span>{isSyncing ? 'Syncing...' : 'Sync Now'}</span>
-                    </button>
-                    <button
-                      onClick={() => signOut()}
-                      className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-300 transition-colors"
-                    >
-                      Sign Out
-                    </button>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-2 border-t border-slate-800/80 text-[11px] text-slate-400">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                    <span>OAuth Session Active (Scopes: calendar.readonly, openid, email, profile)</span>
-                  </div>
-                  <span className="font-mono text-slate-500">
-                    {events.filter((e) => e.source === 'google').length} Google event(s) synced
-                  </span>
-                </div>
-              </div>
-
-              {/* Apple Calendar ICS Subscription */}
-              <div className="p-5 rounded-2xl bg-[#141721] border border-slate-800 space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-slate-200 text-lg">
-                    
-                  </div>
-                  <div>
-                    <h3 className="text-xs font-semibold text-white">Apple Calendar / iCloud ICS</h3>
-                    <p className="text-[11px] text-slate-400">Subscribe directly to any .ics / webcal public or secret link</p>
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <input
-                    type="url"
-                    id="icsUrlInput"
-                    placeholder="webcal://p64-caldav.icloud.com/published/2/..."
-                    className="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
-                  />
-                  <button
-                    onClick={() => {
-                      const input = document.getElementById('icsUrlInput') as HTMLInputElement;
-                      if (!input || !input.value) return;
-                      // Simulated parse test feed
-                      const sampleIcs = `BEGIN:VCALENDAR\nBEGIN:VEVENT\nSUMMARY:Consultation Seminar\nDTSTART:20261115T150000Z\nDTEND:20261115T160000Z\nLOCATION:Room 402\nEND:VEVENT\nEND:VCALENDAR`;
-                      const parsed = parseICS(sampleIcs, 'Apple Calendar');
-                      setEvents((prev) => [...prev, ...parsed]);
-                      alert(`Successfully imported ${parsed.length} event(s) from Apple ICS feed!`);
-                      input.value = '';
-                    }}
-                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-200 rounded-lg transition-colors"
-                  >
-                    Subscribe Feed
-                  </button>
-                </div>
-              </div>
-            </div>
+            <CalendarSettings
+              userEmail={userEmail}
+              googleCalendars={calendarSync.googleCalendars}
+              selectedGoogleIds={calendarSync.selectedGoogleIds}
+              onToggleGoogleCalendar={calendarSync.toggleGoogleCalendar}
+              apple={calendarSync.apple}
+              status={syncStatus}
+              onSyncNow={syncNow}
+              onAddApple={() => setIsOnboardingOpen(true)}
+            />
           )}
         </div>
       </main>
@@ -1371,6 +1298,17 @@ export default function PlannerApp() {
         </div>
       )}
 
+      <OnboardingModal
+        isOpen={isOnboardingOpen}
+        onClose={closeOnboarding}
+        userEmail={userEmail}
+        googleCalendars={calendarSync.googleCalendars}
+        selectedGoogleCalendarIds={calendarSync.selectedGoogleIds}
+        onToggleGoogleCalendar={calendarSync.toggleGoogleCalendar}
+        appleStatus={calendarSync.apple}
+        onAppleConnected={() => syncNow()}
+      />
+
       {/* =========================================================================
           MOBILE BOTTOM TAB BAR (Native iOS Feel)
       ========================================================================= */}
@@ -1381,6 +1319,7 @@ export default function PlannerApp() {
           { id: 'tasks', label: 'Tasks', icon: ListTodo },
           { id: 'inbox', label: 'Inbox', icon: Inbox },
           { id: 'review', label: 'Review', icon: BarChart3 },
+          { id: 'settings', label: 'Settings', icon: Settings },
         ].map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
